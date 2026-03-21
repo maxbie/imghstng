@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Fullscreen Slideshow</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  /* ── Swiper ── */
+  .swiper {
+    width: 100%; height: 100%;
+  }
+  .swiper-slide {
+    overflow: hidden;
+  }
+  .swiper-slide img {
+    display: block;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── Effect Navigator ── */
+  .effect-nav {
+    position: fixed;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px;
+    background: #E8F1FF;
+    border-radius: 150px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    user-select: none;
+    transition: opacity 0.3s;
+    max-width: 90vw;
+  }
+
+  .effect-nav-btn {
+    flex-shrink: 0;
+    width: 54px; height: 54px;
+    border: none;
+    background: #0445C8;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .effect-nav-btn:hover  { background: #0336A0; }
+  .effect-nav-btn:active { transform: scale(0.92); }
+
+  .effect-nav-btn svg {
+    width: 22px; height: 18px;
+    fill: #fff;
+  }
+
+  .effect-name {
+    min-width: 160px;
+    text-align: center;
+    color: #0445C8;
+    line-height: 1.35;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .effect-label {
+    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    opacity: 0.7;
+  }
+  .effect-value {
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -0.15px;
+    white-space: nowrap;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 520px) {
+    .effect-nav {
+      gap: 12px;
+      padding: 10px;
+    }
+    .effect-nav-btn {
+      width: 44px; height: 44px;
+    }
+    .effect-nav-btn svg {
+      width: 18px; height: 14px;
+    }
+    .effect-name {
+      min-width: 110px;
+    }
+    .effect-label {
+      font-size: 11px;
+    }
+    .effect-value {
+      font-size: 16px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Swiper Container -->
+<div class="swiper">
+  <div class="swiper-wrapper">
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img01.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img02.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img03.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img04.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img05.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img06.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img07.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img08.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img09.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img10.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img11.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img12.jpg" alt=""></div>
+    <div class="swiper-slide"><img src="https://maxbie.github.io/imghstng/img13.jpg" alt=""></div>
+  </div>
+</div>
+
+<!-- Effect Navigator -->
+<nav class="effect-nav">
+  <button class="effect-nav-btn" id="prevEffect" aria-label="Vorheriger Effekt">
+    <svg viewBox="0 0 24 20"><path d="M10.5 0.5L0.5 10L10.5 19.5" stroke="white" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <span class="effect-name" id="effectName"><span class="effect-label">Effektname:</span><span class="effect-value" id="effectValue"></span></span>
+  <button class="effect-nav-btn" id="nextEffect" aria-label="Nächster Effekt">
+    <svg viewBox="0 0 24 20"><path d="M13.5 0.5L23.5 10L13.5 19.5" stroke="white" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script>
+(function () {
+  /* ── Effect definitions ── */
+  const effects = [
+    {
+      name: 'Cube',
+      config: {
+        effect: 'cube',
+        cubeEffect: { shadow: true, slideShadows: true, shadowOffset: 30, shadowScale: 0.94 }
+      }
+    },
+    {
+      name: 'Flip',
+      config: {
+        effect: 'flip',
+        flipEffect: { slideShadows: true }
+      }
+    },
+    {
+      name: 'Coverflow',
+      config: {
+        effect: 'coverflow',
+        centeredSlides: true,
+        coverflowEffect: { rotate: 50, stretch: 0, depth: 200, modifier: 1, slideShadows: true }
+      }
+    },
+    {
+      name: 'Cards',
+      config: {
+        effect: 'cards',
+        cardsEffect: { slideShadows: true }
+      }
+    },
+    {
+      name: 'Fade',
+      config: {
+        effect: 'fade',
+        fadeEffect: { crossFade: true }
+      }
+    },
+    {
+      name: 'Creative Slide',
+      config: {
+        effect: 'creative',
+        creativeEffect: {
+          prev: { translate: ['-120%', 0, -500], rotate: [0, 0, -15] },
+          next: { translate: ['120%', 0, -500], rotate: [0, 0, 15] }
+        }
+      }
+    },
+    {
+      name: 'Creative Zoom',
+      config: {
+        effect: 'creative',
+        creativeEffect: {
+          prev: { scale: 0.4, translate: ['-100%', 0, 0], opacity: 0 },
+          next: { scale: 0.4, translate: ['100%', 0, 0], opacity: 0 }
+        }
+      }
+    },
+    {
+      name: 'Creative Rotate',
+      config: {
+        effect: 'creative',
+        creativeEffect: {
+          prev: { translate: [0, 0, -400], rotate: [0, -90, 0] },
+          next: { translate: [0, 0, -400], rotate: [0, 90, 0] }
+        }
+      }
+    },
+    {
+      name: 'Creative Flip Up',
+      config: {
+        effect: 'creative',
+        creativeEffect: {
+          prev: { translate: [0, '-100%', 0], rotate: [0, 0, -25], opacity: 0 },
+          next: { translate: [0, '100%', 0], rotate: [0, 0, 25], opacity: 0 }
+        }
+      }
+    },
+    {
+      name: 'Creative Stack',
+      config: {
+        effect: 'creative',
+        creativeEffect: {
+          prev: { scale: 0.85, translate: [0, 0, -150], shadow: true },
+          next: { translate: ['110%', 0, 0] }
+        }
+      }
+    }
+  ];
+
+  let currentEffectIndex = 0;
+  let swiper = null;
+  let currentSlideIndex = 0;
+
+  const nameEl = document.getElementById('effectValue');
+
+  /* ── Build the slides HTML once (reused on every rebuild) ── */
+  const slidesHTML = document.querySelector('.swiper-wrapper').innerHTML;
+
+  function createSwiper(effectIdx) {
+    /* remember position */
+    if (swiper) {
+      currentSlideIndex = swiper.realIndex;
+      swiper.destroy(true, true);
+    }
+
+    /* restore DOM */
+    document.querySelector('.swiper-wrapper').innerHTML = slidesHTML;
+
+    const eff = effects[effectIdx];
+    nameEl.textContent = eff.name;
+    document.querySelector('.effect-label').textContent = 'Effekt ' + (effectIdx + 1) + ' von ' + effects.length;
+
+    swiper = new Swiper('.swiper', Object.assign({
+      loop: true,
+      speed: 800,
+      grabCursor: false,
+      allowTouchMove: false,
+      autoplay: { delay: 1000, disableOnInteraction: false },
+      initialSlide: currentSlideIndex
+    }, eff.config));
+  }
+
+  function switchEffect(direction) {
+    currentEffectIndex = (currentEffectIndex + direction + effects.length) % effects.length;
+    createSwiper(currentEffectIndex);
+  }
+
+  document.getElementById('prevEffect').addEventListener('click', function () { switchEffect(-1); });
+  document.getElementById('nextEffect').addEventListener('click', function () { switchEffect(1); });
+
+  /* ── Keyboard support ── */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft')  switchEffect(-1);
+    if (e.key === 'ArrowRight') switchEffect(1);
+  });
+
+  /* ── Init ── */
+  createSwiper(0);
+})();
+</script>
+</body>
+</html>
