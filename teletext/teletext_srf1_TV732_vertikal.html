@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+    }
+
+    #wrap {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100vh;
+      height: 100vw;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      transform-origin: center center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <img src="https://api.teletext.ch/online/pics/large/SRF1_732-0.gif" id="tt">
+  </div>
+
+  <script>
+    setInterval(() => {
+      document.getElementById('tt').src =
+        'https://api.teletext.ch/online/pics/large/SRF1_732-0.gif?' + Date.now();
+    }, 60000);
+  </script>
+</body>
+</html>
