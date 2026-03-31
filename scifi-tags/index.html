@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sci-Fi Gallery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #image-wrap {
+    position: absolute;
+    top: 50px;
+    left: 20px;
+    right: 20px;
+    bottom: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #photo-frame {
+    border-radius: 16px;
+    overflow: hidden;
+    flex: 0 0 auto;
+  }
+
+  #photo {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  #footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 20px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 14px;
+    color: #666;
+    z-index: 10;
+  }
+
+  #zone-left, #zone-right {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    z-index: 5;
+    cursor: pointer;
+  }
+
+  #zone-left { left: 0; }
+  #zone-right { right: 0; }
+</style>
+</head>
+<body>
+
+<div id="image-wrap">
+  <div id="photo-frame">
+    <img id="photo" src="" alt="">
+  </div>
+</div>
+
+<div id="footer"></div>
+
+<div id="zone-left"></div>
+<div id="zone-right"></div>
+
+<script>
+const TOTAL = 29;
+const BASE = 'https://maxbie.github.io/imghstng/scifi-tags/';
+
+let current = 0;
+
+const photo = document.getElementById('photo');
+const photoFrame = document.getElementById('photo-frame');
+const imageWrap = document.getElementById('image-wrap');
+const footer = document.getElementById('footer');
+
+function fitImageBox() {
+  if (!photo.naturalWidth || !photo.naturalHeight) return;
+
+  const availW = imageWrap.clientWidth;
+  const availH = imageWrap.clientHeight;
+
+  const imgRatio = photo.naturalWidth / photo.naturalHeight;
+  const boxRatio = availW / availH;
+
+  let renderW, renderH;
+
+  if (imgRatio > boxRatio) {
+    renderW = availW;
+    renderH = availW / imgRatio;
+  } else {
+    renderH = availH;
+    renderW = availH * imgRatio;
+  }
+
+  photoFrame.style.width = renderW + 'px';
+  photoFrame.style.height = renderH + 'px';
+}
+
+function show(i) {
+  current = ((i % TOTAL) + TOTAL) % TOTAL;
+  photo.onload = fitImageBox;
+  photo.src = BASE + (current + 1) + '.png';
+  footer.textContent = 'Bild ' + (current + 1) + '/' + TOTAL;
+}
+
+function prev() { show(current - 1); }
+function next() { show(current + 1); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') prev();
+  if (e.key === 'ArrowRight') next();
+});
+
+document.getElementById('zone-left').addEventListener('click', prev);
+document.getElementById('zone-right').addEventListener('click', next);
+
+let touchStartX = 0;
+document.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 40) {
+    if (dx < 0) next();
+    else prev();
+  }
+});
+
+window.addEventListener('resize', fitImageBox);
+
+show(Math.floor(Math.random() * TOTAL));
+</script>
+</body>
+</html>
