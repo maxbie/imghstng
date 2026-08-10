@@ -167,11 +167,47 @@
   }
   #snackWrap img{width:100%;display:block;}
 
-  /* ---- Voraussetzungen-Panel ---- */
-  #switcherToggle{
+  /* ---- Hotspot-Sichtbarkeit ---- */
+  /* Wenn aktiv, werden alle gerade eingeblendeten Klickflächen dauerhaft markiert. */
+  body.show-hotspots .hot{
+    background:rgba(0,71,196,0.12);
+    border-color:rgba(0,71,196,0.55);
+  }
+  body.show-hotspots .hot:hover{
+    background:rgba(0,71,196,0.24);
+    border-color:rgba(0,71,196,0.9);
+  }
+
+  /* ---- Bedienleiste unten rechts ---- */
+  #controls{
     position:fixed;
     right:22px;
     bottom:22px;
+    z-index:500;
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  #hotspotToggle{
+    background:#fff;
+    color:var(--blue);
+    border:1.5px solid var(--blue);
+    border-radius:30px;
+    padding:10px 16px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(10,26,92,.18);
+  }
+  #hotspotToggle:hover{background:#eef2ff;}
+  #hotspotToggle.on{
+    background:var(--blue);
+    color:#fff;
+    box-shadow:0 8px 20px rgba(0,71,196,.4);
+  }
+
+  /* ---- Voraussetzungen-Panel ---- */
+  #switcherToggle{
     z-index:500;
     background:var(--blue);
     color:#fff;
@@ -287,8 +323,8 @@
       <div id="modalWrap">
         <img id="modalImg" src="assets/modal-a2.png">
         <div id="modalCard">
-          <button class="hot" id="hsModalClose" style="left:88%;top:1%;width:11%;height:8%;z-index:20;" title="Schliessen"></button>
-          <button class="hot" id="hsModalDots" style="left:77.5%;top:1%;width:9%;height:8%;" title="Mehr Optionen"></button>
+          <button class="hot" id="hsModalClose" style="left:91.5%;top:1%;width:8%;height:8%;z-index:20;" title="Schliessen"></button>
+          <button class="hot" id="hsModalDots" style="left:84%;top:1%;width:7%;height:8%;" title="Mehr Optionen"></button>
           <button class="hot" id="hsCtxClear" style="left:53%;top:8%;width:38%;height:13%;display:none;" title="Gedächtnis leeren"></button>
           <button class="hot" id="hsModalSend" style="left:84%;top:77%;width:11%;height:9%;display:none;" title="Senden"></button>
           <button class="hot" id="hsModalCta" style="left:77%;top:43%;width:21%;height:9%;display:none;" title="Einschalten / myAI Pro entdecken"></button>
@@ -313,7 +349,10 @@
   </div>
 </div>
 
-<button id="switcherToggle">⚙ Voraussetzungen</button>
+<div id="controls">
+  <button id="hotspotToggle" title="Alle Klickflächen sichtbar machen">◇ Hotspots</button>
+  <button id="switcherToggle">⚙ Voraussetzungen</button>
+</div>
 <div id="switcher">
   <button id="switcherClose">✕</button>
   <div id="switcherBody"></div>
@@ -330,10 +369,10 @@ const state = {
   modal: null,          // a2 | a2-ctx | a1a | a1b | a6 | a10 | a11
   confirm: null,        // b1 | b2
   confirmFrom: null,    // Modal, aus dem die Rückfrage geöffnet wurde
-  /* Startzustand: myAI Pro · Gedächtnis ein · Inhalte vorhanden · Über mich befüllt */
+  /* Startzustand: myAI Pro · Gedächtnis ein · Inhalte vorhanden · Über mich leer */
   memoryOn: true,
   hasContent: true,
-  hasPersoContent: true,   // "Über mich" / "myAI Anweisungen" befüllt?
+  hasPersoContent: false,  // "Über mich" / "myAI Anweisungen" befüllt?
   plan: 'pro',             // pro | downgraded | free
   snackbar: null
 };
@@ -847,6 +886,10 @@ function renderOutcome(){
 }
 
 
+el('hotspotToggle').addEventListener('click', ()=>{
+  const on = document.body.classList.toggle('show-hotspots');
+  el('hotspotToggle').className = on ? 'on' : '';
+});
 el('switcherToggle').addEventListener('click', ()=>{
   el('switcher').style.display = el('switcher').style.display === 'block' ? 'none' : 'block';
 });
