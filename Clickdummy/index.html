@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>myAI – Personalisierung &amp; Gedächtnis · Clickdummy</title>
+<style>
+  :root{
+    --blue:#0047c4;
+    --navy:#0a1a5c;
+    --bg:#eef0f4;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--navy);
+    height:100%;
+  }
+  .wrap{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+  }
+  /* Bühne: 1440 x 900. Wird das Fenster kleiner, skaliert alles proportional mit,
+     weil sämtliche Kinder in Prozent positioniert sind. */
+  #stage{
+    position:relative;
+    width:min(1440px, calc(100vw - 32px), calc((100vh - 32px) * 1.6));
+    aspect-ratio:1440/900;
+    background:#fff;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(10,26,92,0.25), 0 2px 8px rgba(10,26,92,0.1);
+  }
+  #stage img.base{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+    object-fit:cover;
+  }
+  .hot{
+    position:absolute;
+    background:rgba(0,71,196,0);
+    border:1.5px solid rgba(0,71,196,0);
+    border-radius:8px;
+    cursor:pointer;
+    padding:0;
+    z-index:10;
+    transition:background .12s,border-color .12s;
+  }
+  .hot:hover{
+    background:rgba(0,71,196,0.10);
+    border-color:rgba(0,71,196,0.45);
+  }
+  .hot:active{
+    background:rgba(0,71,196,0.18);
+  }
+
+  /* ---- menu popover ---- */
+  /* Asset 458x508 px auf einer Bühne von 2880x1800 px  ->  458/2880 = 15.90% */
+  #menuWrap{
+    position:absolute;
+    left:29%;
+    bottom:13.5%;
+    width:15.90%;
+    aspect-ratio:458/508;
+    display:none;
+    z-index:40;
+    filter:drop-shadow(0 10px 24px rgba(10,26,92,.25));
+  }
+  #menuWrap img{width:100%;height:100%;display:block;}
+  #menuWrap .hot{border-radius:6px;}
+
+  /* ---- profile flyout ---- */
+  /* Asset 784x1498 px auf einer Bühne von 2880x1800 px  ->  784/2880 = 27.22% */
+  #flyoutWrap{
+    position:absolute;
+    right:1.5%;
+    top:7.5%;
+    width:27.22%;
+    aspect-ratio:784/1498;
+    display:none;
+    z-index:41;
+    filter:drop-shadow(0 10px 24px rgba(10,26,92,.25));
+  }
+  #flyoutWrap img{width:100%;height:100%;display:block;}
+  #flyoutWrap .hot{border-radius:6px;}
+
+  /* ---- dark backdrop for popups/modals ---- */
+  #backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.25);
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+  }
+  /* Startwert; wird je Modal in openModal() gesetzt (600 pt bzw. 480 pt) */
+  #modalWrap{
+    position:relative;
+    width:41.67%;
+  }
+  /* Der Schatten steckt bereits im PNG. Ein CSS-box-shadow würde dem
+     rechteckigen Bildrand folgen statt der abgerundeten Karte darin. */
+  #modalWrap img{width:100%;height:auto;display:block;}
+  /* Die PNGs haben rundherum transparente Schattenpixel. Hotspots werden
+     deshalb nicht am Bild, sondern an der sichtbaren Karte ausgerichtet.
+     Beide Werte hier justieren, falls der Schattenrand anders ausfällt. */
+  #modalCard, #confirmCard{
+    position:absolute;
+    left:var(--pad-x);
+    right:var(--pad-x);
+    top:var(--pad-y);
+    bottom:var(--pad-y);
+  }
+  :root{
+    --pad-x:3.5%;
+    --pad-y:3%;
+  }
+  #modalWrap .hot{border-radius:6px;}
+
+  /* Dialog: 360 pt breit auf einer logischen Bühne von 1440 pt -> 25% */
+  #confirmWrap{
+    position:absolute;
+    width:25%;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    display:none;
+    z-index:110;
+  }
+  #confirmWrap img{width:100%;height:auto;display:block;}
+  #confirmWrap .hot{border-radius:6px;}
+
+  /* ---- settings dynamic rows ---- */
+  .rowImg{
+    position:absolute;
+    display:none;
+    width:52.78%;
+    left:33.33%;
+    pointer-events:none;
+    z-index:5;
+  }
+  .rowImg img{width:100%;height:100%;display:block;}
+
+  /* ---- snackbar ---- */
+  /* 520 pt auf einer Bühne von 1440 pt -> 36.11% */
+  #snackWrap{
+    position:absolute;
+    left:50%;
+    top:4%;
+    transform:translateX(-50%);
+    width:36.11%;
+    display:none;
+    z-index:200;
+    cursor:pointer;
+    filter:drop-shadow(0 10px 24px rgba(0,0,0,.3));
+  }
+  #snackWrap img{width:100%;display:block;}
+
+  /* ---- Voraussetzungen-Panel ---- */
+  #switcherToggle{
+    position:fixed;
+    right:22px;
+    bottom:22px;
+    z-index:500;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:30px;
+    padding:12px 18px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(0,71,196,.4);
+  }
+  #switcherToggle:hover{background:#0039a0;}
+  #switcher{
+    position:fixed;
+    right:22px;
+    bottom:76px;
+    width:320px;
+    max-height:78vh;
+    overflow-y:auto;
+    background:#12194a;
+    color:#eef0f4;
+    border-radius:14px;
+    padding:16px 14px 14px;
+    z-index:500;
+    display:none;
+    box-shadow:0 20px 50px rgba(0,0,0,.4);
+    font-size:13px;
+  }
+  #switcher h3{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#8fa3e0;
+    margin:18px 0 8px;
+  }
+  #switcher h3:first-child{margin-top:0;}
+  #switcher label{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    padding:7px 9px;
+    margin-bottom:4px;
+    border-radius:8px;
+    background:#1c2560;
+    cursor:pointer;
+    line-height:1.35;
+  }
+  #switcher label:hover{background:#26307a;}
+  #switcher label.on{background:var(--blue);}
+  #switcher label.disabled{opacity:.4;cursor:not-allowed;background:#161d52;}
+  #switcher input{margin:2px 0 0;accent-color:#fff;flex:none;}
+  #switcher .note{
+    display:block;
+    font-size:11px;
+    color:#a9b8e8;
+    margin-top:2px;
+  }
+  #switcher label.on .note{color:#dbe4ff;}
+  #outcome{
+    margin-top:18px;
+    padding:10px 11px;
+    border-radius:8px;
+    background:#0a1140;
+    border:1px solid #26307a;
+    font-size:12px;
+    line-height:1.6;
+  }
+  #outcome b{color:#fff;font-weight:600;}
+  #outcome .k{color:#8fa3e0;}
+  #switcherClose{
+    position:absolute;
+    top:10px;right:10px;
+    background:none;border:none;color:#8fa3e0;font-size:16px;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div id="stage">
+    <img class="base" id="baseImg" src="assets/newchat-normal.png" alt="Screen">
+
+    <!-- Chat/New-chat hotspots -->
+    <button class="hot" id="hsAvatar" style="left:91%;top:1.5%;width:8%;height:6%;" title="Einstellungen"></button>
+    <button class="hot" id="hsPlus" style="left:32%;top:87%;width:6%;height:6%;" title="Optionen (Temporär / Personalisiert)"></button>
+    <button class="hot" id="hsSend" style="left:80%;top:87%;width:6%;height:6%;" title="Senden"></button>
+    <button class="hot" id="hsNewChat" style="left:1%;top:7%;width:16%;height:5%;" title="Neuer Chat"></button>
+
+    <!-- Settings hotspots -->
+    <button class="hot" id="hsBack" style="left:3%;top:1.5%;width:11%;height:6%;display:none;" title="Zurück"></button>
+    <button class="hot" id="hsToggle" style="left:80%;top:55%;width:8%;height:5%;display:none;" title="Automatisches Gedächtnis umschalten"></button>
+    <button class="hot" id="hsVerwalten" style="left:78%;top:65%;width:10%;height:5%;display:none;" title="Gedächtnisinhalt verwalten"></button>
+
+    <!-- Settings dynamic rows -->
+    <div class="rowImg" id="rowToggle" style="top:55.06%;height:7.56%;"><img id="rowToggleImg" src="assets/row-toggle-on.png"></div>
+    <div class="rowImg" id="rowContent" style="top:65.28%;height:5.33%;"><img id="rowContentImg" src="assets/row-content-has.png"></div>
+
+    <!-- Menu popover -->
+    <div id="menuWrap">
+      <img id="menuImg" src="assets/menu-newchat-none.png">
+      <button class="hot" id="hsMenuTemp" style="left:4%;top:39%;width:90%;height:9%;" title="Temporär"></button>
+      <button class="hot" id="hsMenuPers" style="left:4%;top:55%;width:90%;height:9%;" title="Personalisiert"></button>
+    </div>
+
+    <!-- Profile flyout -->
+    <div id="flyoutWrap">
+      <img id="flyoutImg" src="assets/profile-flyout.png">
+      <button class="hot" id="hsFlyoutSettings" style="left:5%;top:44%;width:90%;height:7%;" title="Einstellungen"></button>
+    </div>
+
+    <!-- Dark backdrop with modal + stacked confirm popup -->
+    <div id="backdrop">
+      <div id="modalWrap">
+        <img id="modalImg" src="assets/modal-a2.png">
+        <div id="modalCard">
+          <button class="hot" id="hsModalClose" style="left:88%;top:1%;width:11%;height:8%;z-index:20;" title="Schliessen"></button>
+          <button class="hot" id="hsModalDots" style="left:77.5%;top:1%;width:9%;height:8%;" title="Mehr Optionen"></button>
+          <button class="hot" id="hsCtxClear" style="left:53%;top:8%;width:38%;height:13%;display:none;" title="Gedächtnis leeren"></button>
+          <button class="hot" id="hsModalSend" style="left:84%;top:77%;width:11%;height:9%;display:none;" title="Senden"></button>
+          <button class="hot" id="hsModalCta" style="left:77%;top:43%;width:21%;height:9%;display:none;" title="Einschalten / myAI Pro entdecken"></button>
+          <button class="hot" id="hsPersoSave" style="left:7%;top:78%;width:86%;height:10%;display:none;" title="Speichern"></button>
+          <button class="hot" id="hsPersoToggle" style="left:78%;top:63%;width:17%;height:8%;display:none;" title="Automatisches Gedächtnis umschalten"></button>
+        </div>
+      </div>
+      <div id="confirmWrap">
+        <img id="confirmImg" src="assets/popup-b1.png">
+        <div id="confirmCard">
+        <button class="hot" id="hsConfirmDelete" style="left:5%;top:51%;width:90%;height:27%;" title="Gedächtnis leeren"></button>
+        <button class="hot" id="hsConfirmCancel" style="left:25%;top:81%;width:50%;height:10%;" title="Abbrechen"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Snackbar -->
+    <div id="snackWrap">
+      <img id="snackImg" src="assets/snack_anweisung_gespeichert.png">
+      <button class="hot" id="hsSnackNewChat" style="left:4.5%;top:54%;width:31%;height:32%;display:none;z-index:20;" title="Neuer Chat"></button>
+    </div>
+  </div>
+</div>
+
+<button id="switcherToggle">⚙ Voraussetzungen</button>
+<div id="switcher">
+  <button id="switcherClose">✕</button>
+  <div id="switcherBody"></div>
+  <div id="outcome"></div>
+</div>
+
+<script>
+const state = {
+  screen: 'newchat',   // newchat | chat | settings
+  temp: false,
+  pers: false,
+  menuOpen: false,
+  flyoutOpen: false,
+  modal: null,          // a2 | a2-ctx | a1a | a1b | a6 | a10 | a11
+  confirm: null,        // b1 | b2
+  confirmFrom: null,    // Modal, aus dem die Rückfrage geöffnet wurde
+  /* Startzustand: myAI Pro · Gedächtnis ein · Inhalte vorhanden · Über mich befüllt */
+  memoryOn: true,
+  hasContent: true,
+  hasPersoContent: true,   // "Über mich" / "myAI Anweisungen" befüllt?
+  plan: 'pro',             // pro | downgraded | free
+  snackbar: null
+};
+let snackTimer = null;
+
+const el = id => document.getElementById(id);
+
+function baseScreenSrc(){
+  if(state.screen === 'settings'){
+    return state.hasPersoContent
+      ? 'assets/settings_personalisation_notempty.png'
+      : 'assets/settings_personalisation_empty.png';
+  }
+  if(state.screen === 'chat')     return state.temp ? 'assets/chat-temp.png' : 'assets/chat-normal.png';
+  return state.temp ? 'assets/newchat-temp.png' : 'assets/newchat-normal.png';
+}
+
+function toggleRowSrc(){
+  if(state.plan === 'free') return 'assets/row-toggle-free.png';
+  if(state.plan === 'downgraded') return 'assets/row-toggle-downgraded.png';
+  if(state.memoryOn) return 'assets/row-toggle-on.png';
+  return state.hasContent ? 'assets/row-toggle-off-content.png' : 'assets/row-toggle-off-empty.png';
+}
+function contentRowSrc(){
+  if(state.hasContent) return 'assets/row-content-has.png';
+  return isMemoryActive() ? 'assets/row-content-empty-active.png' : 'assets/row-content-empty-inactive.png';
+}
+/* Gedächtnis läuft nur, wenn Pro UND Toggle ein. */
+function isMemoryActive(){
+  return state.plan === 'pro' && state.memoryOn;
+}
+/* Personalisierung ist für einen neuen Chat aktiv, sobald irgendetwas hinterlegt ist:
+   "Über mich", "myAI Anweisungen" oder ein laufendes Gedächtnis. Sonst standardmässig aus. */
+function persDefault(){
+  return state.hasPersoContent || isMemoryActive();
+}
+/* Nichts hinterlegt -> "Personalisiert" öffnet die Personalisierungs-Einstellungen,
+   statt für diesen Chat umzuschalten. */
+function nothingPopulated(){
+  return !persDefault();
+}
+/* "Verwalten" existiert nur, wenn Inhalte da sind oder das Gedächtnis aktiv ist.
+   Im Zustand "Leer, nicht aktiv" hat die Zeile keinen Button – das Popup ist dort nicht erreichbar. */
+function hasVerwaltenButton(){
+  return state.hasContent || isMemoryActive();
+}
+function modalSrc(m){
+  return {
+    'a2':'assets/modal-a2.png','a2-ctx':'assets/modal-a2-ctx.png',
+    'a1a':'assets/modal-a1a.png','a1b':'assets/modal-a1b.png',
+    'a6':'assets/modal-a6.png','a10':'assets/modal-a10.png','a11':'assets/modal-a11.png',
+    'a6-ctx':'assets/a6_wird_gespeichert_contect_menu_opened.png',
+    'a10-ctx':'assets/a10_gedaechtnis_aus_pro_contect_menu_opened.png',
+    'a11-ctx':'assets/a11_gedaechtnis_aus_free_context_menu_opened.png',
+    'perso-pro':'assets/popup_adjusted_popup_pro_user.png',
+    'perso-pro-on':'assets/popup_adjusted_popup_pro_user_on.png',
+    'perso-free':'assets/popup_adjusted_popup_free_user.png'
+  }[m];
+}
+/* Breiten in Prozent der 1440-pt-Bühne:
+   Gedächtnis-Popup 600 pt -> 41.67%, Personalisierung 480 pt -> 33.33% */
+const MODAL_WIDTH_DEFAULT = '41.67%';
+const MODAL_WIDTH = { 'perso-pro':'33.33%', 'perso-pro-on':'33.33%', 'perso-free':'33.33%' };
+const PERSO_MODALS = ['perso-pro','perso-pro-on','perso-free'];
+/* Modals mit geöffnetem Kontextmenü und die zugehörige Rückfrage-Variante */
+const CTX_OF   = { 'a2':'a2-ctx', 'a6':'a6-ctx', 'a10':'a10-ctx', 'a11':'a11-ctx' };
+const CTX_KEYS = ['a2-ctx','a6-ctx','a10-ctx','a11-ctx'];
+const CONFIRM_OF_CTX = { 'a2-ctx':'b1', 'a6-ctx':'b1', 'a10-ctx':'b2', 'a11-ctx':'b2' };
+const baseOf = m => (m || '').replace('-ctx','');
+const SNACKS = {
+  /* neue Exporte */
+  'instruction':'assets/snack_anweisung_gespeichert.png',
+  'cleared':'assets/snack_gedaechtnis_geleert.png',
+  'toggle-off':'assets/snack_toggle_aus.png',
+  'toggle-on':'assets/snack_toggle_ein.png',
+  'pers-on':'assets/snack_personalisierung_eingeschaltet.png',
+  'pers-off':'assets/snack_personalisierung_ausgeschaltet.png',
+  /* "bitte neuen Chat" – erscheinen nur im laufenden Chat */
+  'pers-start':'assets/snack-pers-start.png',
+  'pers-end':'assets/snack-pers-end.png',
+  'temp-start':'assets/snack-temp-start.png',
+  'temp-end':'assets/snack-temp-end.png'
+};
+
+/* Diese vier Snackbars enthalten einen "Neuer Chat"-Button. */
+const SNACKS_WITH_NEWCHAT = ['pers-start','pers-end','temp-start','temp-end'];
+
+function showSnack(key, ms){
+  state.snackbar = key;
+  el('snackImg').src = SNACKS[key];
+  el('hsSnackNewChat').style.display = SNACKS_WITH_NEWCHAT.includes(key) ? 'block' : 'none';
+  el('snackWrap').style.display = 'block';
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(()=>{ el('snackWrap').style.display='none'; state.snackbar=null; }, ms || 3200);
+}
+function hideSnack(){
+  el('snackWrap').style.display='none';
+  state.snackbar = null;
+  clearTimeout(snackTimer);
+}
+el('snackWrap').addEventListener('click', hideSnack);
+el('hsSnackNewChat').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  hideSnack();
+  closeAll();
+  state.screen = 'newchat';
+  state.temp = false;
+  state.pers = persDefault();
+  render();
+});
+
+function menuSrc(){
+  // Im laufenden Chat sind die Einträge deaktiviert (Modus kann nicht mehr gewechselt werden),
+  // im Neuen Chat sind sie aktiv anwählbar.
+  const prefix = state.screen === 'chat' ? 'menu-chat' : 'menu-newchat';
+  const suffix = state.temp && state.pers ? 'both' : state.temp ? 'temp' : state.pers ? 'pers' : 'none';
+  return 'assets/' + prefix + '-' + suffix + '.png';
+}
+function closeMenu(){ state.menuOpen = false; el('menuWrap').style.display = 'none'; }
+function openMenu(){
+  closeFlyout();
+  state.menuOpen = true;
+  el('menuImg').src = menuSrc();
+  el('menuWrap').style.display = 'block';
+}
+
+function closeFlyout(){ state.flyoutOpen = false; el('flyoutWrap').style.display = 'none'; }
+function openFlyout(){
+  closeMenu();
+  state.flyoutOpen = true;
+  el('flyoutWrap').style.display = 'block';
+}
+
+function closeModal(){
+  state.modal = null; state.confirm = null;
+  el('backdrop').style.display = 'none';
+  el('confirmWrap').style.display = 'none';
+  el('modalWrap').style.display = 'block';
+}
+function openModal(m){
+  closeMenu(); closeFlyout();
+  state.modal = m;
+  el('modalImg').src = modalSrc(m);
+  el('backdrop').style.display = 'flex';
+  el('modalWrap').style.display = 'block';
+  el('confirmWrap').style.display = 'none';
+  state.confirm = null;
+  // toggle hotspots relevant to state
+  el('modalWrap').style.width = MODAL_WIDTH[m] || MODAL_WIDTH_DEFAULT;
+  el('hsModalDots').style.display = CTX_OF[m] ? 'block' : 'none';
+  el('hsCtxClear').style.display  = CTX_KEYS.includes(m) ? 'block' : 'none';
+  el('hsModalSend').style.display = (m==='a2') ? 'block' : 'none';
+  el('hsModalCta').style.display  = (m==='a10' || m==='a11') ? 'block' : 'none';
+  el('hsPersoSave').style.display = PERSO_MODALS.includes(m) ? 'block' : 'none';
+  el('hsPersoToggle').style.display = (m==='perso-pro' || m==='perso-pro-on') ? 'block' : 'none';
+}
+/* B1 (langer Text) und B2 (kurzer Text) sind unterschiedlich hoch,
+   deshalb sitzen die Buttons anteilig an anderer Stelle. */
+const CONFIRM_HOTSPOTS = {
+  b1: { del:{top:'60%', height:'19%'}, cancel:{top:'82%', height:'14%'} },
+  b2: { del:{top:'51%', height:'22%'}, cancel:{top:'79%', height:'15%'} }
+};
+function openConfirm(which){
+  state.confirm = which;
+  state.confirmFrom = state.modal;   // wohin "Abbrechen" zurückführt
+  el('modalWrap').style.display = 'none';   // kein Stapeln zweier Popups
+  el('confirmImg').src = which==='b1' ? 'assets/popup-b1.png' : 'assets/popup-b2.png';
+  const h = CONFIRM_HOTSPOTS[which];
+  el('hsConfirmDelete').style.top    = h.del.top;
+  el('hsConfirmDelete').style.height = h.del.height;
+  el('hsConfirmCancel').style.top    = h.cancel.top;
+  el('hsConfirmCancel').style.height = h.cancel.height;
+  el('confirmWrap').style.display = 'block';
+}
+
+function closeAll(){
+  closeMenu(); closeFlyout(); closeModal(); hideSnack();
+}
+
+/* Welches Gedächtnis-Popup passt zum aktuellen Zustand? null = gibt es nicht. */
+function correctMemoryModal(){
+  if(!hasVerwaltenButton()) return null;
+  if(isMemoryActive()) return state.hasContent ? 'a2' : 'a1a';
+  return state.plan === 'pro' ? 'a10' : 'a11';
+}
+function correctPersoModal(){
+  if(state.plan !== 'pro') return 'perso-free';
+  return state.memoryOn ? 'perso-pro-on' : 'perso-pro';
+}
+/* Offene Overlays bleiben offen und wechseln nur die Ausprägung.
+   Geschlossen wird nur, was es im neuen Zustand gar nicht gibt. */
+function reconcileOverlays(){
+  if(state.confirm){
+    const want = isMemoryActive() ? 'b1' : 'b2';
+    if(want !== state.confirm){
+      state.confirm = want;
+      el('confirmImg').src = want === 'b1' ? 'assets/popup-b1.png' : 'assets/popup-b2.png';
+      const h = CONFIRM_HOTSPOTS[want];
+      el('hsConfirmDelete').style.top = h.del.top;
+      el('hsConfirmDelete').style.height = h.del.height;
+      el('hsConfirmCancel').style.top = h.cancel.top;
+      el('hsConfirmCancel').style.height = h.cancel.height;
+    }
+    return;                      // Rückfrage bleibt stehen, Modal dahinter bleibt verborgen
+  }
+  if(!state.modal) return;
+
+  if(PERSO_MODALS.includes(state.modal)){
+    const t = correctPersoModal();
+    if(t !== state.modal) openModal(t);
+    return;
+  }
+  const wasCtx = state.modal.endsWith('-ctx');
+  let t = correctMemoryModal();
+  if(!t){ closeModal(); return; }
+  if(state.modal === 'a1b' && t === 'a1a') t = 'a1b';   // "nach dem Leeren" beibehalten
+  const target = (wasCtx && CTX_OF[t]) ? CTX_OF[t] : t;
+  if(target !== state.modal) openModal(target);
+}
+
+function render(){
+  el('baseImg').src = baseScreenSrc();
+  const isSettings = state.screen === 'settings';
+  const isTemp = state.temp && state.screen !== 'settings';
+
+  el('hsBack').style.display      = isSettings ? 'block' : 'none';
+  el('hsToggle').style.display    = isSettings ? 'block' : 'none';
+  el('hsVerwalten').style.display = (isSettings && hasVerwaltenButton()) ? 'block' : 'none';
+  el('rowToggle').style.display   = isSettings ? 'block' : 'none';
+  el('rowContent').style.display  = isSettings ? 'block' : 'none';
+
+  el('hsAvatar').style.display  = isSettings ? 'none' : 'block';
+  el('hsAvatar').title = isTemp ? 'Temporären Chat beenden' : 'Einstellungen';
+  el('hsPlus').style.display    = isSettings ? 'none' : 'block';
+  el('hsSend').style.display    = isSettings ? 'none' : 'block';
+  el('hsNewChat').style.display = isSettings ? 'none' : 'block';
+
+  if(isSettings){
+    el('rowToggleImg').src = toggleRowSrc();
+    el('rowContentImg').src = contentRowSrc();
+  }
+  if(state.menuOpen){
+    el('menuImg').src = menuSrc();        // Haken folgt dem aktuellen Zustand
+  } else {
+    el('menuWrap').style.display = 'none';
+  }
+  if(!state.flyoutOpen) el('flyoutWrap').style.display = 'none';
+  buildPanel();                            // Voraussetzungen spiegeln das UI
+}
+
+/* ---------- interactions ---------- */
+el('hsPlus').addEventListener('click', ()=>{ state.menuOpen ? closeMenu() : openMenu(); });
+
+el('hsMenuTemp').addEventListener('click', ()=>{
+  if(state.screen === 'chat'){
+    showSnack(state.temp ? 'temp-end' : 'temp-start');
+    closeMenu();
+  } else {
+    state.temp = !state.temp;   // Temporär und Personalisiert schliessen sich nicht aus
+    closeMenu();
+    render();
+  }
+});
+el('hsMenuPers').addEventListener('click', ()=>{
+  if(state.screen === 'chat'){
+    showSnack(state.pers ? 'pers-end' : 'pers-start');
+    closeMenu();
+    return;
+  }
+  if(nothingPopulated()){
+    // Es gibt nichts zu personalisieren -> Einstellungen öffnen statt umschalten
+    closeMenu();
+    openModal(state.plan === 'pro' ? 'perso-pro' : 'perso-free');
+    return;
+  }
+  state.pers = !state.pers;
+  closeMenu();
+  render();
+  showSnack(state.pers ? 'pers-on' : 'pers-off');
+});
+
+el('hsSend').addEventListener('click', ()=>{
+  if(state.screen === 'newchat'){
+    state.screen = 'chat';
+    closeMenu(); closeFlyout();
+    render();
+  }
+});
+el('hsNewChat').addEventListener('click', ()=>{
+  state.screen = 'newchat'; state.temp = false;
+  state.pers = persDefault();  // abgeleiteter Standard, nicht fix "aus"
+  closeMenu(); closeFlyout(); render();
+});
+el('hsAvatar').addEventListener('click', ()=>{
+  if(state.temp && state.screen !== 'settings'){
+    state.screen = 'newchat'; state.temp = false;
+    render();
+  } else {
+    state.flyoutOpen ? closeFlyout() : openFlyout();
+  }
+});
+el('hsFlyoutSettings').addEventListener('click', ()=>{
+  closeFlyout();
+  state.screen = 'settings';
+  render();
+});
+el('hsBack').addEventListener('click', ()=>{
+  state.screen = 'newchat';
+  state.pers = persDefault();          // Änderungen in den Einstellungen wirken sofort
+  closeMenu(); closeFlyout(); render();
+});
+
+el('hsToggle').addEventListener('click', ()=>{
+  if(state.plan !== 'pro') return; // Free/Downgraded: toggle not available
+  state.memoryOn = !state.memoryOn;
+  state.pers = persDefault();
+  showSnack(state.memoryOn ? 'toggle-on' : 'toggle-off');
+  render();
+});
+
+el('hsVerwalten').addEventListener('click', ()=>{
+  if(!hasVerwaltenButton()) return;      // "Leer, nicht aktiv" – kein Button, kein Popup
+  if(isMemoryActive()) {
+    openModal(state.hasContent ? 'a2' : 'a1a');   // gefüllt oder "wird aufgebaut"
+  } else if(state.plan === 'pro'){
+    openModal('a10');                     // Pro, Toggle aus, Inhalte vorhanden
+  } else {
+    openModal('a11');                     // Downgraded, Inhalte vorhanden
+  }
+});
+
+el('hsModalClose').addEventListener('click', closeModal);
+el('hsModalDots').addEventListener('click', ()=>{
+  const ctx = CTX_OF[state.modal];
+  if(ctx) openModal(ctx);
+});
+el('hsCtxClear').addEventListener('click', ()=>{
+  openConfirm(CONFIRM_OF_CTX[state.modal] || 'b2');
+});
+el('hsModalSend').addEventListener('click', ()=>{
+  openModal('a6');
+  setTimeout(()=>{
+    openModal('a2');
+    showSnack('instruction');
+  }, 1400);
+});
+el('hsModalCta').addEventListener('click', ()=>{
+  if(state.modal === 'a10'){
+    state.memoryOn = true;
+    showSnack('toggle-on');
+    openModal('a2');
+    render();
+  }
+  // a11 "myAI Pro entdecken" – kein Ziel in diesem Prototyp
+});
+
+el('hsPersoToggle').addEventListener('click', ()=>{
+  state.memoryOn = !state.memoryOn;
+  openModal(state.memoryOn ? 'perso-pro-on' : 'perso-pro');
+  showSnack(state.memoryOn ? 'toggle-on' : 'toggle-off');
+  state.pers = persDefault();
+  render();
+});
+el('hsPersoSave').addEventListener('click', ()=>{
+  closeModal();
+  state.pers = persDefault();   // Gedächtnis ein -> Personalisierung ist ab jetzt aktiv
+  render();
+});
+el('hsConfirmDelete').addEventListener('click', ()=>{
+  state.hasContent = false;
+  el('confirmWrap').style.display = 'none';
+  if(isMemoryActive()){
+    openModal('a1b');          // Gedächtnis läuft weiter -> wird neu aufgebaut
+  } else {
+    closeModal();              // aus/Free: "Verwalten" verschwindet, Popup schliesst
+  }
+  showSnack('cleared');
+  render();
+});
+el('hsConfirmCancel').addEventListener('click', ()=>{
+  el('confirmWrap').style.display = 'none';
+  state.confirm = null;
+  openModal(baseOf(state.confirmFrom) || 'a2');
+});
+el('backdrop').addEventListener('click', (e)=>{
+  if(e.target.id === 'backdrop') closeModal();
+});
+el('baseImg').addEventListener('click', ()=>{
+  if(state.menuOpen) closeMenu();
+  if(state.flyoutOpen) closeFlyout();
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Escape') return;
+  if(state.confirm){ openModal(baseOf(state.confirmFrom) || 'a2'); return; }
+  if(state.modal){ closeModal(); return; }
+  closeMenu(); closeFlyout();
+});
+
+/* ---------- Voraussetzungen-Panel ----------
+   Statt einzelner Screens werden hier die Bedingungen gesetzt,
+   aus denen sich alle Zustände ergeben. */
+
+const CONDITIONS = [
+  {
+    title: 'Konto',
+    key: 'plan',
+    get: () => state.plan,
+    options: [
+      { value:'pro',        label:'myAI Pro',              note:'Gedächtnis kann ein- und ausgeschaltet werden.' },
+      { value:'free',       label:'Free – nie Pro gehabt', note:'Kein Gedächtnis, keine gespeicherten Inhalte.' },
+      { value:'downgraded', label:'Free – nach Downgrade', note:'Gespeicherte Inhalte bleiben lesbar.' }
+    ],
+    set(v){
+      state.plan = v;
+      if(v === 'free')       state.hasContent = false;   // nie Inhalte gehabt
+      if(v === 'downgraded') state.hasContent = true;    // Downgrade heisst: Inhalte sind noch da
+      if(v !== 'pro')        state.memoryOn = false;     // ohne Pro läuft nichts
+    }
+  },
+  {
+    title: 'Automatisches Gedächtnis',
+    key: 'memoryOn',
+    get: () => state.memoryOn ? 'on' : 'off',
+    disabled: () => state.plan !== 'pro',
+    disabledHint: 'Nur mit myAI Pro',
+    options: [
+      { value:'on',  label:'Eingeschaltet', note:'Nächtliche Aufnahme läuft — aktiviert auch die Personalisierung.' },
+      { value:'off', label:'Ausgeschaltet', note:'Nichts wird gelernt, nichts injiziert.' }
+    ],
+    set(v){ state.memoryOn = (v === 'on'); }
+  },
+  {
+    title: 'Gedächtnisinhalt',
+    key: 'hasContent',
+    get: () => state.hasContent ? 'yes' : 'no',
+    disabled: () => state.plan !== 'pro',
+    disabledHint: 'Durch das Konto festgelegt',
+    options: [
+      { value:'yes', label:'Inhalte vorhanden', note:'«Verwalten» zeigt das Dokument.' },
+      { value:'no',  label:'Leer',              note:'Noch nichts gespeichert.' }
+    ],
+    set(v){ state.hasContent = (v === 'yes'); }
+  },
+  {
+    title: 'Über mich & myAI Anweisungen',
+    key: 'hasPersoContent',
+    get: () => state.hasPersoContent ? 'yes' : 'no',
+    options: [
+      { value:'yes', label:'Befüllt', note:'Aktiviert die Personalisierung für neue Chats.' },
+      { value:'no',  label:'Leer',    note:'Trägt nichts bei — ein laufendes Gedächtnis aktiviert sie trotzdem.' }
+    ],
+    set(v){ state.hasPersoContent = (v === 'yes'); }
+  }
+];
+
+function applyConditions(){
+  state.pers = persDefault();
+  reconcileOverlays();   // offene Popups bleiben, wechseln nur die Ausprägung
+  render();
+}
+
+function buildPanel(){
+  const body = el('switcherBody');
+  body.innerHTML = '';
+  CONDITIONS.forEach(group => {
+    const off = group.disabled ? group.disabled() : false;
+    const h = document.createElement('h3');
+    h.textContent = group.title + (off && group.disabledHint ? ' · ' + group.disabledHint : '');
+    body.appendChild(h);
+
+    group.options.forEach(opt => {
+      const lab = document.createElement('label');
+      const checked = group.get() === opt.value;
+      lab.className = (checked ? 'on ' : '') + (off ? 'disabled' : '');
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = group.key;
+      input.checked = checked;
+      input.disabled = off;
+      input.addEventListener('change', ()=>{ group.set(opt.value); applyConditions(); });
+
+      const txt = document.createElement('span');
+      txt.innerHTML = opt.label + (opt.note ? '<span class="note">' + opt.note + '</span>' : '');
+
+      lab.appendChild(input);
+      lab.appendChild(txt);
+      body.appendChild(lab);
+    });
+  });
+  renderOutcome();
+}
+
+function renderOutcome(){
+  // Personalisierung ist aktiv, sobald eine der Quellen greift – hier steht welche.
+  const quellen = [];
+  if(state.hasPersoContent) quellen.push('Über mich / Anweisungen');
+  if(isMemoryActive())      quellen.push('Gedächtnis läuft');
+  const perso = quellen.length
+    ? 'ein <span class="k">(' + quellen.join(' + ') + ')</span>'
+    : 'aus <span class="k">(keine Quelle befüllt)</span>';
+
+  const rows = [
+    ['Gedächtnis läuft',               isMemoryActive() ? 'ja' : 'nein'],
+    ['«Verwalten» sichtbar',           hasVerwaltenButton() ? 'ja' : 'nein'],
+    ['Personalisierung im neuen Chat', perso],
+    ['«Personalisiert» im Plus-Menü',  nothingPopulated() ? 'öffnet Einstellungen' : 'schaltet um']
+  ];
+  el('outcome').innerHTML = '<b>Daraus folgt</b><br>' +
+    rows.map(([k,v]) => '<span class="k">' + k + ':</span> ' + v).join('<br>');
+}
+
+
+el('switcherToggle').addEventListener('click', ()=>{
+  el('switcher').style.display = el('switcher').style.display === 'block' ? 'none' : 'block';
+});
+el('switcherClose').addEventListener('click', ()=> el('switcher').style.display = 'none');
+
+state.pers = persDefault();   // Startwert ableiten statt fix "aus"
+el('switcher').style.display = 'block';   // initial offen, damit es nicht übersehen wird
+buildPanel();
+render();
+</script>
+</body>
+</html>
