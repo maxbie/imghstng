@@ -303,7 +303,6 @@
 
     <!-- Settings dynamic rows -->
     <div class="rowImg" id="rowToggle" style="top:55.06%;height:7.56%;"><img id="rowToggleImg" src="assets/row-toggle-on.png"></div>
-    <div class="rowImg" id="rowContent" style="top:65.28%;height:5.33%;"><img id="rowContentImg" src="assets/row-content-has.png"></div>
 
     <!-- Menu popover -->
     <div id="menuWrap">
@@ -328,6 +327,7 @@
           <button class="hot" id="hsCtxClear" style="left:53%;top:8%;width:38%;height:13%;display:none;" title="Gedächtnis leeren"></button>
           <button class="hot" id="hsModalSend" style="left:84%;top:77%;width:11%;height:9%;display:none;" title="Senden"></button>
           <button class="hot" id="hsModalCta" style="left:77%;top:43%;width:21%;height:9%;display:none;" title="Einschalten / myAI Pro entdecken"></button>
+          <button class="hot" id="hsEmptyCta" style="left:32%;top:73%;width:36%;height:11%;display:none;" title="Einschalten / myAI Pro entdecken"></button>
           <button class="hot" id="hsPersoSave" style="left:7%;top:78%;width:86%;height:10%;display:none;" title="Speichern"></button>
           <button class="hot" id="hsPersoToggle" style="left:78%;top:63%;width:17%;height:8%;display:none;" title="Automatisches Gedächtnis umschalten"></button>
         </div>
@@ -396,10 +396,6 @@ function toggleRowSrc(){
   if(state.memoryOn) return 'assets/row-toggle-on.png';
   return state.hasContent ? 'assets/row-toggle-off-content.png' : 'assets/row-toggle-off-empty.png';
 }
-function contentRowSrc(){
-  if(state.hasContent) return 'assets/row-content-has.png';
-  return isMemoryActive() ? 'assets/row-content-empty-active.png' : 'assets/row-content-empty-inactive.png';
-}
 /* Gedächtnis läuft nur, wenn Pro UND Toggle ein. */
 function isMemoryActive(){
   return state.plan === 'pro' && state.memoryOn;
@@ -414,10 +410,10 @@ function persDefault(){
 function nothingPopulated(){
   return !persDefault();
 }
-/* "Verwalten" existiert nur, wenn Inhalte da sind oder das Gedächtnis aktiv ist.
-   Im Zustand "Leer, nicht aktiv" hat die Zeile keinen Button – das Popup ist dort nicht erreichbar. */
+/* Die Sektion "Gedächtnisinhalt" ist Teil des Grundbilds und immer sichtbar,
+   "Verwalten" gibt es daher in jedem Zustand. */
 function hasVerwaltenButton(){
-  return state.hasContent || isMemoryActive();
+  return true;
 }
 function modalSrc(m){
   return {
@@ -429,6 +425,8 @@ function modalSrc(m){
     'a11-ctx':'assets/a11_gedaechtnis_aus_free_context_menu_opened.png',
     'perso-pro':'assets/popup_adjusted_popup_pro_user.png',
     'perso-pro-on':'assets/popup_adjusted_popup_pro_user_on.png',
+    'a13':'assets/modal-a13.png',
+    'a14':'assets/modal-a14.png',
     'perso-free':'assets/popup_adjusted_popup_free_user.png'
   }[m];
 }
@@ -526,6 +524,7 @@ function openModal(m){
   el('hsCtxClear').style.display  = CTX_KEYS.includes(m) ? 'block' : 'none';
   el('hsModalSend').style.display = (m==='a2') ? 'block' : 'none';
   el('hsModalCta').style.display  = (m==='a10' || m==='a11') ? 'block' : 'none';
+  el('hsEmptyCta').style.display  = (m==='a13' || m==='a14') ? 'block' : 'none';
   el('hsPersoSave').style.display = PERSO_MODALS.includes(m) ? 'block' : 'none';
   el('hsPersoToggle').style.display = (m==='perso-pro' || m==='perso-pro-on') ? 'block' : 'none';
 }
@@ -554,9 +553,9 @@ function closeAll(){
 
 /* Welches Gedächtnis-Popup passt zum aktuellen Zustand? null = gibt es nicht. */
 function correctMemoryModal(){
-  if(!hasVerwaltenButton()) return null;
-  if(isMemoryActive()) return state.hasContent ? 'a2' : 'a1a';
-  return state.plan === 'pro' ? 'a10' : 'a11';
+  if(isMemoryActive())  return state.hasContent ? 'a2'  : 'a1a';   // läuft
+  if(state.hasContent)  return state.plan === 'pro' ? 'a10' : 'a11'; // aus, aber Inhalte da
+  return state.plan === 'pro' ? 'a13' : 'a14';                     // aus und leer
 }
 function correctPersoModal(){
   if(state.plan !== 'pro') return 'perso-free';
@@ -600,9 +599,8 @@ function render(){
 
   el('hsBack').style.display      = isSettings ? 'block' : 'none';
   el('hsToggle').style.display    = isSettings ? 'block' : 'none';
-  el('hsVerwalten').style.display = (isSettings && hasVerwaltenButton()) ? 'block' : 'none';
+  el('hsVerwalten').style.display = isSettings ? 'block' : 'none';
   el('rowToggle').style.display   = isSettings ? 'block' : 'none';
-  el('rowContent').style.display  = isSettings ? 'block' : 'none';
 
   el('hsAvatar').style.display  = isSettings ? 'none' : 'block';
   el('hsAvatar').title = isTemp ? 'Temporären Chat beenden' : 'Einstellungen';
@@ -612,7 +610,6 @@ function render(){
 
   if(isSettings){
     el('rowToggleImg').src = toggleRowSrc();
-    el('rowContentImg').src = contentRowSrc();
   }
   if(state.menuOpen){
     el('menuImg').src = menuSrc();        // Haken folgt dem aktuellen Zustand
@@ -694,14 +691,7 @@ el('hsToggle').addEventListener('click', ()=>{
 });
 
 el('hsVerwalten').addEventListener('click', ()=>{
-  if(!hasVerwaltenButton()) return;      // "Leer, nicht aktiv" – kein Button, kein Popup
-  if(isMemoryActive()) {
-    openModal(state.hasContent ? 'a2' : 'a1a');   // gefüllt oder "wird aufgebaut"
-  } else if(state.plan === 'pro'){
-    openModal('a10');                     // Pro, Toggle aus, Inhalte vorhanden
-  } else {
-    openModal('a11');                     // Downgraded, Inhalte vorhanden
-  }
+  openModal(correctMemoryModal());
 });
 
 el('hsModalClose').addEventListener('click', closeModal);
@@ -729,6 +719,14 @@ el('hsModalCta').addEventListener('click', ()=>{
   // a11 "myAI Pro entdecken" – kein Ziel in diesem Prototyp
 });
 
+el('hsEmptyCta').addEventListener('click', ()=>{
+  if(state.modal !== 'a13') return;   // A14 führt zum Pro-Angebot, im Prototyp ohne Ziel
+  state.memoryOn = true;
+  state.pers = persDefault();
+  openModal('a1a');                    // ab jetzt: wird aufgebaut
+  showSnack('toggle-on');
+  render();
+});
 el('hsPersoToggle').addEventListener('click', ()=>{
   state.memoryOn = !state.memoryOn;
   openModal(state.memoryOn ? 'perso-pro-on' : 'perso-pro');
@@ -877,7 +875,7 @@ function renderOutcome(){
 
   const rows = [
     ['Gedächtnis läuft',               isMemoryActive() ? 'ja' : 'nein'],
-    ['«Verwalten» sichtbar',           hasVerwaltenButton() ? 'ja' : 'nein'],
+    ['«Verwalten» öffnet',             correctMemoryModal().toUpperCase()],
     ['Personalisierung im neuen Chat', perso],
     ['«Personalisiert» im Plus-Menü',  nothingPopulated() ? 'öffnet Einstellungen' : 'schaltet um']
   ];
