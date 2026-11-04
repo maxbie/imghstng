@@ -156,6 +156,54 @@
     transition: opacity .2s, transform .2s;
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* Analysis */
+  .analysis-view { border-radius: 18px; overflow: hidden; background: #000; margin-top: 8px; }
+  .analysis-view canvas { display: block; width: 100%; height: auto; max-height: 58vh; object-fit: contain; }
+  .progress { list-style: none; padding: 0; margin: 18px 0 0; }
+  .progress li { display: flex; align-items: center; gap: 12px; padding: 11px 0; color: var(--muted); border-top: 1px solid var(--line); transition: color .2s; }
+  .progress li::before {
+    content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; line-height: 1;
+  }
+  .progress li.active { color: var(--ink); }
+  .progress li.active::before { border-color: var(--ink); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .progress li.done { color: var(--ink); }
+  .progress li.done::before { content: "✓"; background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Draping steps */
+  .stage.sticky { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 3; max-height: 50vh; }
+  .steps { list-style: none; padding: 0; margin: 20px 0 0; counter-reset: step; }
+  .steps > li { counter-increment: step; position: relative; padding: 18px 0 18px 46px; border-top: 1px solid var(--line); }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 18px; width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-weight: 650; font-size: .95rem;
+  }
+  .steps h3 { margin: 3px 0 4px; }
+  .chips-sub { margin: 14px 0 0; }
+
+  /* Tuning */
+  .tune-live {
+    position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 2;
+    display: flex; align-items: center; gap: 14px; margin: 14px 0; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  }
+  .tune-live.bump { animation: bump .6s ease-out; }
+  @keyframes bump { from { background: var(--line); } to { background: var(--surface); } }
+  .tune-strip { display: flex; width: 76px; height: 38px; border-radius: 8px; overflow: hidden; flex: none; }
+  .tune-strip span { flex: 1; background: var(--c); }
+  .tune-live b { display: block; font-size: 1.1rem; }
+  .tune-block { padding: 14px 0 6px; }
+  .tune-block .row { display: flex; justify-content: space-between; gap: 10px; }
+  .tune-block output { color: var(--muted); }
+  .tune-block input[type="range"] { width: 100%; margin: 10px 0 2px; accent-color: var(--ink); }
+  .slider-ends { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); }
+  .tune-block .axis { margin: 12px 0 6px; }
+  @media (prefers-reduced-motion: reduce) {
+    .progress li.active::before, .tune-live.bump { animation: none; }
+    .dot { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -209,6 +257,18 @@
     </div>
   </section>
 
+  <!-- Analyzing -->
+  <section id="analyzing" class="screen" aria-labelledby="h-analyzing">
+    <h2 id="h-analyzing" tabindex="-1">Analyse läuft</h2>
+    <div class="analysis-view"><canvas id="analysisCanvas" aria-hidden="true"></canvas></div>
+    <ol class="progress" id="progress">
+      <li>Gesicht erkennen</li>
+      <li>Hautton messen</li>
+      <li>Haare und Augen erfassen</li>
+      <li>Farbtyp bestimmen</li>
+    </ol>
+  </section>
+
   <!-- Result -->
   <section id="result" class="screen" aria-labelledby="h-result">
     <p class="kicker">Am ehesten bist du</p>
@@ -241,17 +301,33 @@
     </details>
     <details class="tune">
       <summary>Feintuning</summary>
-      <p class="muted" style="margin-top:10px">Die Schwellenwerte sind Schätzungen. Wenn das Ergebnis danebenliegt, kannst du sie hier anpassen.</p>
-      <label><span class="row"><span>Neutraler Hautton bei</span><output id="o-hue"></output></span>
-        <input type="range" id="t-hue" min="40" max="72" step="1">
-        <span class="muted" id="m-hue"></span></label>
-      <label><span class="row"><span>Mitte zwischen hell und dunkel</span><output id="o-light"></output></span>
-        <input type="range" id="t-light" min="30" max="65" step="1">
-        <span class="muted" id="m-light"></span></label>
-      <label><span class="row"><span>Mitte für Kontrast</span><output id="o-contrast"></output></span>
-        <input type="range" id="t-contrast" min="10" max="50" step="1">
-        <span class="muted" id="m-contrast"></span></label>
-      <button class="link" id="t-reset">Standardwerte</button>
+      <div class="tune-live" id="tuneLive" aria-live="polite">
+        <div class="tune-strip" id="tuneStrip"></div>
+        <div><b id="tuneType"></b><span class="muted" id="tunePct"></span></div>
+      </div>
+      <p class="muted">Liegt das Ergebnis daneben, verschiebe die Einstufung. Das Ergebnis oben passt sich sofort an.</p>
+      <div class="tune-block">
+        <div class="row"><b>Temperatur</b><output id="o-t"></output></div>
+        <input type="range" id="t-t" min="-1" max="1" step="0.05" aria-label="Temperatur kälter oder wärmer einstufen">
+        <div class="slider-ends"><span>kälter einstufen</span><span>wärmer einstufen</span></div>
+        <div id="ax-t"></div>
+        <p class="muted" id="m-t"></p>
+      </div>
+      <div class="tune-block">
+        <div class="row"><b>Helligkeit</b><output id="o-v"></output></div>
+        <input type="range" id="t-v" min="-1" max="1" step="0.05" aria-label="Helligkeit dunkler oder heller einstufen">
+        <div class="slider-ends"><span>dunkler einstufen</span><span>heller einstufen</span></div>
+        <div id="ax-v"></div>
+        <p class="muted" id="m-v"></p>
+      </div>
+      <div class="tune-block">
+        <div class="row"><b>Klarheit</b><output id="o-c"></output></div>
+        <input type="range" id="t-c" min="-1" max="1" step="0.05" aria-label="Klarheit gedämpfter oder klarer einstufen">
+        <div class="slider-ends"><span>gedämpfter einstufen</span><span>klarer einstufen</span></div>
+        <div id="ax-c"></div>
+        <p class="muted" id="m-c"></p>
+      </div>
+      <button class="link" id="t-reset">Zurücksetzen</button>
     </details>
   </section>
 
@@ -259,25 +335,36 @@
   <section id="drape" class="screen" aria-labelledby="h-drape">
     <h2 id="h-drape" tabindex="-1">Farben testen</h2>
     <div class="mode" role="radiogroup" aria-label="Darstellung">
-      <button role="radio" aria-checked="true" data-mode="frame">Rahmen</button>
-      <button role="radio" aria-checked="false" data-mode="shirt">Oberteil</button>
+      <button role="radio" aria-checked="true" data-mode="shirt">Oberteil</button>
+      <button role="radio" aria-checked="false" data-mode="frame">Rahmen</button>
     </div>
-    <p id="drapeText"></p>
-    <div class="stage">
+    <p class="muted" id="drapeText"></p>
+    <div class="stage sticky">
       <video id="drapeVideo" class="mirror" playsinline muted autoplay></video>
       <img id="drapeImg" alt="">
       <canvas id="recolorCanvas" aria-label="Kamerabild mit umgefärbtem Oberteil"></canvas>
       <div class="drape" id="drapeLayer"></div>
       <div class="stage-hint" id="recolorHint" hidden></div>
     </div>
-    <div class="chip-group">
-      <p class="muted" id="chipsMineLabel"></p>
-      <div class="chips" id="chipsMine" role="group"></div>
-    </div>
-    <div class="chip-group">
-      <p class="muted" id="chipsOppLabel"></p>
-      <div class="chips" id="chipsOpp" role="group"></div>
-    </div>
+    <ol class="steps">
+      <li>
+        <h3>Farbe wählen</h3>
+        <p class="muted">Tippe eine Farbe aus deiner Palette (<span id="mineName"></span>).</p>
+        <div class="chips" id="chipsMine" role="group" aria-label="Deine Farben"></div>
+        <p class="muted chips-sub">Basisfarben für Hosen, Jacken und Schuhe</p>
+        <div class="chips" id="chipsBasics" role="group" aria-label="Deine Basisfarben"></div>
+      </li>
+      <li>
+        <h3>Gegenprobe machen</h3>
+        <p class="muted">Tippe eine Farbe, die dir laut Analyse weniger steht (<span id="oppName"></span>).</p>
+        <div class="chips" id="chipsOpp" role="group" aria-label="Farben zur Gegenprobe"></div>
+      </li>
+      <li>
+        <h3>Direkt vergleichen</h3>
+        <p class="muted">Wechsle zwischen beiden Farben. Achte darauf, ob dein Gesicht frischer oder fahler wirkt und ob Schatten unter den Augen stärker werden.</p>
+        <div class="btns" style="margin:14px 0 0"><button class="primary" id="btnSwap" disabled>Zur Gegenprobe wechseln</button></div>
+      </li>
+    </ol>
     <div class="btns">
       <button class="secondary" id="btnDrapeBack">Zurück zum Ergebnis</button>
     </div>
@@ -302,7 +389,7 @@ const MAX_SIDE = 1280;
 const SKIN_POINTS = [50, 101, 118, 205, 280, 330, 347, 425, 151, 108, 337];
 const IRISES = [[468, [469, 470, 471, 472]], [473, [474, 475, 476, 477]]];
 const PAPER_REFLECTANCE = 0.85;
-const DEFAULT_TUNE = { hue: 56, light: 47, contrast: 28 };
+const DEFAULT_TUNE = { t: 0, v: 0, c: 0 };   // user offsets, -1 ... +1
 
 // ==PURE-START==
 // ---------------------------------------------------------------------------
@@ -332,7 +419,7 @@ function linToLab(r, g, b) {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
 
-function labToRgb(L, a, b) {
+function labToLin(L, a, b) {
   const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
   const finv = t => (t ** 3 > EPS ? t ** 3 : (116 * t - 16) / KAPPA);
   const X = finv(fx) * 0.95047, Y = L > 8 ? fy ** 3 : L / KAPPA, Z = finv(fz) * 1.08883;
@@ -341,7 +428,19 @@ function labToRgb(L, a, b) {
     -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z,
     0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
   ];
-  return lin.map(c => LIN_TO_SRGB[Math.round(clamp(c, 0, 1) * 4095)]);
+  return lin;
+}
+
+const encode = lin => lin.map(c => LIN_TO_SRGB[Math.round(clamp(c, 0, 1) * 4095)]);
+const labToRgb = (L, a, b) => encode(labToLin(L, a, b));
+
+// Reduce chroma until the colour fits into sRGB instead of clipping channels (avoids neon artefacts)
+function labToRgbInGamut(L, a, b) {
+  for (let f = 1; f > 0.05; f *= 0.9) {
+    const lin = labToLin(L, a * f, b * f);
+    if (lin.every(c => c >= -0.002 && c <= 1.002)) return encode(lin);
+  }
+  return labToRgb(L, 0, 0);
 }
 
 function labToHex(L, a, b) {
@@ -377,51 +476,61 @@ const wavg = pairs => {
 // The 12 types. vec = [temperature (+warm), value (+light), clarity (+clear)]
 // ---------------------------------------------------------------------------
 const TYPES = [
-  { id: "light-spring", en: "Light Spring", de: "Heller Frühling", season: "Frühling", vec: [0.4, 1, 0.3], sig: "#FFCBA4",
+  { id: "light-spring", en: "Light Spring", de: "Heller Frühling", season: "Frühling", vec: [0.4, 1, 0.3], sig: "#EFB592",
     desc: "Hell und warm mit klarer Note. Zarte, frische Farben wie Pfirsich, Butter und helles Aqua.",
-    palette: ["#FFCBA4","#F88379","#F7A1A1","#FBE29F","#7FD8D0","#A8E6CF","#9DB4F0","#CFC6B8","#FFF6E0","#D9B38C","#FA9E7C","#6CCFD9"] },
-  { id: "true-spring", en: "True Spring", de: "Warmer Frühling", season: "Frühling", vec: [1, 0.3, 0.5], sig: "#FF7F50",
+    colors: ["#EFB592","#E8907F","#EBD58C","#8CCBC2","#A9D3B3","#9AA9DA","#EBA9A6","#6BB8BE"],
+    basics: ["#F3EBDD","#D8BC97","#C9C2B6","#4E6185"] },
+  { id: "true-spring", en: "True Spring", de: "Warmer Frühling", season: "Frühling", vec: [1, 0.3, 0.5], sig: "#E2735A",
     desc: "Ganz warm und lebendig. Goldene, sonnige Farben wie Koralle, Apricot und Grasgrün.",
-    palette: ["#FF7F50","#FFB347","#FFC72C","#3CB371","#00A99D","#E34234","#F4A460","#8B5A2B","#FFF1D6","#4F9DDE","#C68E17","#9ACD32"] },
-  { id: "bright-spring", en: "Bright Spring", de: "Klarer Frühling", season: "Frühling", vec: [0.4, 0.2, 1], sig: "#FF3E6C",
-    desc: "Klar und warm-neutral mit viel Kontrast. Leuchtende Farben wie Korallpink, Türkis und Kobalt.",
-    palette: ["#FF3E6C","#FF6F00","#FFE600","#00C49A","#00B7EB","#2F5BEA","#8E44AD","#FF4F79","#32CD32","#1C2A5C","#FAF8F0","#F2C14E"] },
-  { id: "light-summer", en: "Light Summer", de: "Heller Sommer", season: "Sommer", vec: [-0.4, 1, -0.3], sig: "#B0C4DE",
-    desc: "Hell und kühl mit sanfter Note. Pudrige Pastelltöne wie Rosé, Flieder und Himmelblau.",
-    palette: ["#F4C2C2","#E6A8D7","#B0C4DE","#AEC6CF","#98D8C8","#C8A2C8","#D8D8E0","#F5F5F2","#9FB6CD","#E7B8C3","#7FA6C9","#8FBFB0"] },
-  { id: "true-summer", en: "True Summer", de: "Kühler Sommer", season: "Sommer", vec: [-1, 0.3, -0.5], sig: "#6A8CAF",
+    colors: ["#E2735A","#E9A15F","#E2B746","#6FA35A","#2E9C93","#CC4A3B","#4C83C0","#E8927A"],
+    basics: ["#F0E4CC","#C49A6C","#7B5A3C","#34466B"] },
+  { id: "bright-spring", en: "Bright Spring", de: "Klarer Frühling", season: "Frühling", vec: [0.4, 0.2, 1], sig: "#E05A78",
+    desc: "Klar und warm-neutral mit viel Kontrast. Lebhafte Farben wie Korallpink, Türkis und Kobalt.",
+    colors: ["#E05A78","#E8673F","#EDC740","#3E9E5C","#1FA2A8","#3A62C2","#7A4FA6","#E05462"],
+    basics: ["#F4F0E6","#BDB6AA","#4A3E38","#283C6B"] },
+  { id: "light-summer", en: "Light Summer", de: "Heller Sommer", season: "Sommer", vec: [-0.4, 1, -0.3], sig: "#A9BFD8",
+    desc: "Hell und kühl mit sanfter Note. Pudrige Töne wie Rosé, Flieder und Himmelblau.",
+    colors: ["#E3B9C0","#CC8E9C","#B9A6CC","#A9BFD8","#9CC6C3","#B4CDBE","#8FA1CF","#A898C2"],
+    basics: ["#EFEDE8","#BFC1C6","#8796A8","#4A5A72"] },
+  { id: "true-summer", en: "True Summer", de: "Kühler Sommer", season: "Sommer", vec: [-1, 0.3, -0.5], sig: "#6F8DB0",
     desc: "Ganz kühl und eher gedämpft. Rosé, Mauve, Taubenblau und Schiefer.",
-    palette: ["#4F6D8F","#6A8CAF","#B0809F","#D3889F","#7C9EB2","#5F8F8B","#8C7DA8","#9C2F55","#A9B1BD","#2E3F5C","#C06C84","#E6E6EC"] },
-  { id: "soft-summer", en: "Soft Summer", de: "Gedämpfter Sommer", season: "Sommer", vec: [-0.4, 0.1, -1], sig: "#9C8AA5",
+    colors: ["#C27C8E","#A3445F","#A7869B","#6F8DB0","#55708F","#4E8582","#8E85B0","#7E5672"],
+    basics: ["#ECEBE8","#9A9EA6","#4B5464","#2E3B55"] },
+  { id: "soft-summer", en: "Soft Summer", de: "Gedämpfter Sommer", season: "Sommer", vec: [-0.4, 0.1, -1], sig: "#9A8CA6",
     desc: "Gedämpft und kühl-neutral. Rauchige Töne wie Altrosa, Salbeigrau und Taupe.",
-    palette: ["#8E9AAF","#A89F9A","#9C8AA5","#7D8F8A","#B28C99","#6E7F80","#5C6B7A","#C2B4A8","#94A49E","#A26E7E","#4E5A66","#D6CFC7"] },
-  { id: "soft-autumn", en: "Soft Autumn", de: "Gedämpfter Herbst", season: "Herbst", vec: [0.4, 0.1, -1], sig: "#C9A27E",
+    colors: ["#B58A93","#9A8CA6","#8E9C92","#7489A0","#5F8582","#8C6E73","#94586A","#8597A6"],
+    basics: ["#DDD8D0","#9E968F","#575A60","#3F4A5C"] },
+  { id: "soft-autumn", en: "Soft Autumn", de: "Gedämpfter Herbst", season: "Herbst", vec: [0.4, 0.1, -1], sig: "#8F9A78",
     desc: "Gedämpft und warm-neutral. Weiche Erdtöne wie Camel, Salbei und Lachs.",
-    palette: ["#C9A27E","#A7A37E","#B5806A","#8F9779","#D4A59A","#9C8A6E","#6F8A82","#B89B72","#A0785A","#E3D3BC","#7E6B5A","#C08A80"] },
-  { id: "true-autumn", en: "True Autumn", de: "Warmer Herbst", season: "Herbst", vec: [1, -0.3, -0.5], sig: "#CC7722",
+    colors: ["#CF9686","#B4735B","#8F9A78","#7D7A52","#5C8580","#C9A65E","#C98272","#A69C76"],
+    basics: ["#DCCDB5","#B8976E","#8E8070","#5E4C3E"] },
+  { id: "true-autumn", en: "True Autumn", de: "Warmer Herbst", season: "Herbst", vec: [1, -0.3, -0.5], sig: "#A9532C",
     desc: "Ganz warm und erdig. Rost, Ocker, Oliv und Senf.",
-    palette: ["#B5651D","#CC7722","#DAA520","#808000","#556B2F","#8B4513","#A0522D","#E2725B","#367588","#6B4226","#F0E2B6","#C04000"] },
-  { id: "deep-autumn", en: "Deep Autumn", de: "Dunkler Herbst", season: "Herbst", vec: [0.4, -1, -0.3], sig: "#7B3F00",
+    colors: ["#A9532C","#C4693F","#C99A2E","#7A7A35","#3E5B3A","#2F6B6E","#B5432F","#D27A2C"],
+    basics: ["#EDE0C4","#B98A55","#5C3F2A","#5A5236"] },
+  { id: "deep-autumn", en: "Deep Autumn", de: "Dunkler Herbst", season: "Herbst", vec: [0.4, -1, -0.3], sig: "#7A2632",
     desc: "Dunkel und warm. Satte Töne wie Schokolade, Waldgrün und Bordeaux.",
-    palette: ["#7B3F00","#4B5320","#8B0000","#B8860B","#2F4F4F","#00563F","#C1440E","#3D2B1F","#1F4E5A","#E1C699","#702963","#A0522D"] },
-  { id: "deep-winter", en: "Deep Winter", de: "Dunkler Winter", season: "Winter", vec: [-0.4, -1, 0.3], sig: "#5B2C6F",
-    desc: "Dunkel und kühl. Tiefe Juwelentöne wie Burgund, Indigo, Smaragd und Schwarz.",
-    palette: ["#141414","#F5F5F5","#800020","#4B0082","#014421","#0F2C59","#B0003A","#5B2C6F","#006D6F","#36454F","#DC143C","#1B3A4B"] },
-  { id: "true-winter", en: "True Winter", de: "Kühler Winter", season: "Winter", vec: [-1, -0.3, 0.5], sig: "#0047AB",
-    desc: "Ganz kühl und kontrastreich. Reines Weiss, Schwarz, Kobalt, Fuchsia und echtes Rot.",
-    palette: ["#0A0A0A","#FFFFFF","#E60026","#0047AB","#00A86B","#D1007A","#4B0082","#008B8B","#DCEFFA","#1C2841","#8A8D93","#C71585"] },
-  { id: "bright-winter", en: "Bright Winter", de: "Klarer Winter", season: "Winter", vec: [-0.4, -0.2, 1], sig: "#FF007F",
-    desc: "Klar und kühl-neutral mit maximalem Kontrast. Pink, Royalblau und Zitronengelb.",
-    palette: ["#FF007F","#1F4FFF","#00C08B","#FFEF00","#E0115F","#7F00FF","#00B5E2","#FFFFFF","#000000","#FF2400","#40E0D0","#C8A2FF"] },
+    colors: ["#7A2632","#9A3E2A","#B5532A","#24575A","#2F4F35","#5A2E45","#B78B2E","#5E5F30"],
+    basics: ["#D8C3A0","#3E2A20","#3B3633","#4A4A2C"] },
+  { id: "deep-winter", en: "Deep Winter", de: "Dunkler Winter", season: "Winter", vec: [-0.4, -1, 0.3], sig: "#1E6B52",
+    desc: "Dunkel und kühl. Tiefe Juwelentöne wie Burgund, Saphir, Smaragd und Schwarz.",
+    colors: ["#7A1E33","#B3243B","#1E6B52","#145E66","#4B2E7A","#24448A","#6A2C5A","#234A3C"],
+    basics: ["#F2F2F0","#1A1A1C","#3A3D44","#1E2A44"] },
+  { id: "true-winter", en: "True Winter", de: "Kühler Winter", season: "Winter", vec: [-1, -0.3, 0.5], sig: "#2650A8",
+    desc: "Ganz kühl und kontrastreich. Reines Weiss, Schwarz, Kobalt, Beere und echtes Rot.",
+    colors: ["#C4202F","#B8287A","#2650A8","#158A5E","#5A3393","#CFE0EE","#12737A","#9E1F55"],
+    basics: ["#F7F7F5","#151517","#8C8F96","#1F2B4A"] },
+  { id: "bright-winter", en: "Bright Winter", de: "Klarer Winter", season: "Winter", vec: [-0.4, -0.2, 1], sig: "#D63A82",
+    desc: "Klar und kühl-neutral mit viel Kontrast. Pink, Royalblau, Smaragd und Zitronengelb.",
+    colors: ["#D63A82","#2E58C9","#1E9E6E","#E6D44A","#D02C3C","#6E3DBF","#1BA3B5","#C3B7E6"],
+    basics: ["#FAFAFA","#111113","#3B3E45","#1D2A56"] },
 ];
 
-// Rainbow order for chromatic colours, neutrals (light to dark) at the end
-function sortPalette(hexes) {
-  const items = hexes.map(hex => ({ hex, ...lch(hexToLab(hex)) }));
-  const chroma = items.filter(c => c.C >= 12).sort((p, q) => ((p.h + 340) % 360) - ((q.h + 340) % 360));
-  const neutral = items.filter(c => c.C < 12).sort((p, q) => q.L - p.L);
-  return [...chroma, ...neutral].map(c => c.hex);
-}
+// Colours in rainbow order, basics from light to dark
+const hueKey = hex => (lch(hexToLab(hex)).h + 340) % 360;
+const sortColors = hexes => [...hexes].sort((p, q) => hueKey(p) - hueKey(q));
+const sortBasics = hexes => [...hexes].sort((p, q) => hexToLab(q)[0] - hexToLab(p)[0]);
+const paletteOf = type => [...sortColors(type.colors), ...sortBasics(type.basics)];
 
 // Measurements -> three axes -> ranking of all 12 types
 function classify(m, tune) {
@@ -748,10 +857,70 @@ function measure(img, lm, mask) {
   return { skin, eyes, hair, hairEstimated, debug };
 }
 
+const PHASE_MS = 950;   // four phases, just under 4 s in total
+
+function runAnalysisAnimation(lm) {
+  const img = state.corrected, W = img.width, H = img.height;
+  const base = document.createElement("canvas");
+  base.width = W; base.height = H;
+  const bctx = base.getContext("2d");
+  bctx.putImageData(img, 0, 0);
+  bctx.fillStyle = "rgba(0,0,0,.3)";
+  bctx.fillRect(0, 0, W, H);
+
+  const c = $("analysisCanvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+  const items = [...$("progress").children];
+  items.forEach(li => { li.className = ""; });
+
+  const m = state.meas, d = m.debug;
+  const skinHex = labToHex(m.skin.L, m.skin.a, m.skin.b);
+  const colors = paletteOf(classifyNow().ranking[0].type);
+  const lw = Math.max(2, W / 400), dotR = Math.max(1, W / 600);
+  const ring = (x, y, r, color) => {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.lineWidth = lw + 2; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.stroke();
+    ctx.lineWidth = lw; ctx.strokeStyle = color; ctx.stroke();
+  };
+
+  return new Promise(resolve => {
+    const t0 = performance.now(), total = PHASE_MS * 4;
+    const frame = now => {
+      const t = now - t0;
+      const phase = Math.min(3, Math.floor(t / PHASE_MS));
+      const f = clamp((t - phase * PHASE_MS) / PHASE_MS, 0, 1);
+      const upto = (n, p) => (phase > p || t >= total ? n : phase === p ? Math.ceil(n * f) : 0);
+      items.forEach((li, i) => {
+        li.classList.toggle("done", i < phase || t >= total);
+        li.classList.toggle("active", i === phase && t < total);
+      });
+
+      ctx.drawImage(base, 0, 0);
+      ctx.fillStyle = "rgba(255,255,255,.75)";
+      for (let i = 0, n = upto(lm.length, 0); i < n; i += 2) ctx.fillRect(lm[i].x * W - dotR, lm[i].y * H - dotR, dotR * 2, dotR * 2);
+      for (let k = 0, n = upto(d.skin.length, 1); k < n; k++) {
+        const s = d.skin[k];
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fillStyle = skinHex; ctx.fill();
+        ring(s.x, s.y, s.r, "#fff");
+      }
+      ctx.fillStyle = "rgba(255, 0, 200, .5)";
+      for (let k = 0, n = upto(d.hair.length, 2); k < n; k++) ctx.fillRect(d.hair[k].x - lw, d.hair[k].y - lw, lw * 2, lw * 2);
+      for (let k = 0, n = upto(d.eyes.length, 2); k < n; k++) ring(d.eyes[k].x, d.eyes[k].y, d.eyes[k].R * 0.9, "#00e5ff");
+      const nCol = upto(colors.length, 3), sw = W / colors.length, sh = Math.max(16, H * 0.07);
+      for (let k = 0; k < nCol; k++) { ctx.fillStyle = colors[k]; ctx.fillRect(k * sw, H - sh, Math.ceil(sw), sh); }
+
+      if (t >= total) { setTimeout(resolve, 300); return; }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
 $("btnAnalyze").onclick = async () => {
   const btn = $("btnAnalyze");
   btn.disabled = true;
-  btn.textContent = "Analysiere …";
+  btn.textContent = "Einen Moment …";
   try {
     let models;
     try { models = await state.models; }
@@ -773,12 +942,15 @@ $("btnAnalyze").onclick = async () => {
 
     state.corrected = applyGains(state.srcData, state.gains);
     state.meas = measure(state.corrected, lm, mask);
+    show("analyzing");
+    await runAnalysisAnimation(lm);
     renderResult();
     drawDebug();
     show("result");
   } catch (e) {
     console.error(e);
     toast("Die Analyse ist fehlgeschlagen. Versuche es mit einer neuen Aufnahme.");
+    show("calibrate");
   } finally {
     btn.disabled = false;
     btn.textContent = "Analysieren";
@@ -792,10 +964,27 @@ const fmt = n => Math.round(n).toString();
 const pct = p => `${Math.round(p * 100)} %`;
 let currentBest = null;
 
-function renderResult() {
+const axisHTML = (lo, hi, val) => `
+  <div class="axis" role="img" aria-label="${lo} bis ${hi}: ${val >= 0 ? hi : lo}, Stärke ${Math.round(Math.abs(val) * 100)} %">
+    <div class="axis-labels"><span>${lo}</span><span>${hi}</span></div>
+    <div class="track"><div class="dot" style="--x:${(val + 1) * 50}%"></div></div>
+  </div>`;
+
+const TUNE_WORDS = { t: ["kälter", "wärmer"], v: ["dunkler", "heller"], c: ["gedämpfter", "klarer"] };
+const tuneLabel = (key, x) => Math.abs(x) < 0.05 ? "neutral"
+  : `${Math.abs(x) < 0.5 ? "etwas" : "deutlich"} ${TUNE_WORDS[key][x > 0 ? 1 : 0]}`;
+
+// User offsets shift the internal thresholds: "wärmer einstufen" lowers the neutral skin hue, etc.
+function classifyNow() {
+  const tn = state.tune;
+  return classify(state.meas, { hue: 56 - tn.t * 14, light: 47 - tn.v * 15, contrast: 28 - tn.c * 18 });
+}
+
+function renderResult(fromTune = false) {
   const m = state.meas;
-  const r = classify(m, state.tune);
+  const r = classifyNow();
   const best = r.ranking[0].type;
+  const changed = currentBest && currentBest !== best;
   currentBest = best;
 
   $("h-result").textContent = best.en;
@@ -803,21 +992,12 @@ function renderResult() {
   $("typeDesc").textContent = best.desc;
 
   const heights = ["100%", "90%", "96%", "86%", "94%", "98%", "88%", "95%", "91%", "100%", "87%", "93%"];
-  const pal = sortPalette(best.palette);
+  const pal = paletteOf(best);
   $("palette").innerHTML = pal.map((hex, i) =>
-    `<button style="--c:${hex};--h:${heights[i % heights.length]}" aria-label="${hex}" aria-pressed="false" data-hex="${hex}"></button>`).join("");
-  $("paletteCaption").textContent = "Tippe auf eine Farbe für den Farbcode.";
+    `<button style="--c:${hex};--h:${heights[i % heights.length]}" aria-label="${hex}" aria-pressed="false" data-hex="${hex}" data-basic="${i >= best.colors.length}"></button>`).join("");
+  $("paletteCaption").textContent = "Links Farben für Oberteile, rechts Basisfarben für Hosen, Jacken und Schuhe. Tippe auf eine Farbe für den Farbcode.";
 
-  const axes = [
-    ["Kalt", "Warm", r.t],
-    ["Dunkel", "Hell", r.v],
-    ["Gedämpft", "Klar", r.c],
-  ];
-  $("axes").innerHTML = axes.map(([lo, hi, val]) => `
-    <div class="axis" role="img" aria-label="${lo} bis ${hi}: ${val >= 0 ? hi : lo}, Stärke ${Math.round(Math.abs(val) * 100)} %">
-      <div class="axis-labels"><span>${lo}</span><span>${hi}</span></div>
-      <div class="track"><div class="dot" style="--x:${(val + 1) * 50}%"></div></div>
-    </div>`).join("");
+  $("axes").innerHTML = axisHTML("Kalt", "Warm", r.t) + axisHTML("Dunkel", "Hell", r.v) + axisHTML("Gedämpft", "Klar", r.c);
 
   const swatch = (name, c, note = "") => c
     ? `<div><div class="sw" style="--c:${labToHex(c.L, c.a, c.b)}"></div><b>${name}</b>
@@ -832,34 +1012,47 @@ function renderResult() {
     : "Ohne Weissabgleich gemessen. Die Werte hängen stark vom Licht ab.";
 
   $("alts").innerHTML = r.ranking.slice(1, 4).map(({ type, p }) => `
-    <li><span class="mini">${type.palette.slice(0, 4).map(h => `<span style="--c:${h}"></span>`).join("")}</span>
+    <li><span class="mini">${sortColors(type.colors).slice(0, 4).map(h => `<span style="--c:${h}"></span>`).join("")}</span>
         <span>${type.en}<br><span class="muted">${type.de}</span></span>
         <span class="pct">${pct(p)}</span></li>`).join("");
 
-  // Tuning panel
-  for (const key of ["hue", "light", "contrast"]) {
-    $(`t-${key}`).value = state.tune[key];
-    $(`o-${key}`).textContent = key === "hue" ? `${state.tune[key]}°` : state.tune[key];
+  // Tuning panel: live result on top, each slider directly above the axis it moves
+  const tn = state.tune;
+  for (const key of ["t", "v", "c"]) {
+    $(`t-${key}`).value = tn[key];
+    $(`o-${key}`).textContent = tuneLabel(key, tn[key]);
   }
-  $("m-hue").textContent = `Dein Hautton: ${fmt(m.skin.h)}°`;
-  $("m-light").textContent = `Deine mittlere Helligkeit: ${fmt(r.lightness)}`;
-  $("m-contrast").textContent = (m.hair || m.eyes) ? `Dein Kontrast: ${fmt(r.contrast)}` : "Kontrast nicht messbar";
+  $("ax-t").innerHTML = axisHTML("Kalt", "Warm", r.t);
+  $("ax-v").innerHTML = axisHTML("Dunkel", "Hell", r.v);
+  $("ax-c").innerHTML = axisHTML("Gedämpft", "Klar", r.c);
+  $("m-t").textContent = `Gemessener Hautton: ${fmt(m.skin.h)}°`;
+  $("m-v").textContent = `Gemessene Helligkeit: ${fmt(r.lightness)}`;
+  $("m-c").textContent = (m.hair || m.eyes) ? `Gemessener Kontrast: ${fmt(r.contrast)}` : "Kontrast nicht messbar";
+  $("tuneType").textContent = best.en;
+  $("tunePct").textContent = `${best.de}, ${pct(r.ranking[0].p)}`;
+  $("tuneStrip").innerHTML = sortColors(best.colors).slice(0, 4).map(h => `<span style="--c:${h}"></span>`).join("");
+  if (fromTune && changed) {
+    const box = $("tuneLive");
+    box.classList.remove("bump");
+    void box.offsetWidth;
+    box.classList.add("bump");
+  }
 }
 
 $("palette").addEventListener("click", e => {
   const b = e.target.closest("button");
   if (!b) return;
   $("palette").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
-  $("paletteCaption").textContent = `Farbcode ${b.dataset.hex}`;
+  $("paletteCaption").textContent = `${b.dataset.basic === "true" ? "Basisfarbe" : "Farbe für Oberteile"}, Farbcode ${b.dataset.hex}`;
 });
 
-for (const key of ["hue", "light", "contrast"]) {
+for (const key of ["t", "v", "c"]) {
   $(`t-${key}`).addEventListener("input", e => {
     state.tune[key] = Number(e.target.value);
-    renderResult();
+    renderResult(true);
   });
 }
-$("t-reset").onclick = () => { state.tune = { ...DEFAULT_TUNE }; renderResult(); };
+$("t-reset").onclick = () => { state.tune = { ...DEFAULT_TUNE }; renderResult(true); };
 
 function drawDebug() {
   const c = $("debugCanvas");
@@ -886,16 +1079,28 @@ function drawDebug() {
 // Draping
 // ---------------------------------------------------------------------------
 const DRAPE_TEXT = {
-  frame: "Achte darauf, ob dein Gesicht frischer oder fahler wirkt und ob Schatten unter den Augen stärker werden.",
-  shirt: "Dein Oberteil wird in die gewählte Farbe umgefärbt, Falten und Schatten bleiben erhalten. Schultern und Oberkörper sollten im Bild sein.",
+  shirt: "Dein Oberteil wird live umgefärbt, Falten und Schatten bleiben erhalten. Schultern und Oberkörper sollten im Bild sein.",
+  frame: "Die Farbe liegt als Rahmen um dein Gesicht, wie ein Tuch bei der Farbberatung.",
 };
+const drapeSel = { mine: null, opp: null, showing: null };
 
-function setDrape(hex) {
+function setDrape(hex, group) {
   recolor.hex = hex;
+  drapeSel[group] = hex;
+  drapeSel.showing = group;
   $("drapeLayer").style.setProperty("--drape", hex);
-  document.querySelectorAll(".chip").forEach(ch => ch.setAttribute("aria-pressed", ch.dataset.hex === hex ? "true" : "false"));
+  document.querySelectorAll(".chip").forEach(ch =>
+    ch.setAttribute("aria-pressed", ch.dataset.hex === hex && ch.dataset.group === group ? "true" : "false"));
+  const swap = $("btnSwap");
+  swap.disabled = !(drapeSel.mine && drapeSel.opp);
+  swap.textContent = group === "opp" ? "Zurück zu deiner Farbe" : "Zur Gegenprobe wechseln";
   if (recolor.mode === "shirt" && !recolor.live) renderStill();
 }
+
+$("btnSwap").onclick = () => {
+  const g = drapeSel.showing === "opp" ? "mine" : "opp";
+  setDrape(drapeSel[g], g);
+};
 
 // ---------------------------------------------------------------------------
 // Live recolouring of clothing (segmenter class 4)
@@ -903,7 +1108,7 @@ function setDrape(hex) {
 // ---------------------------------------------------------------------------
 const SEG_CLOTHES = 4;
 const RECOLOR_MAX = 640;
-const recolor = { mode: "frame", live: false, segPromise: null, seg: null, raf: 0, lastTs: 0,
+const recolor = { mode: "shirt", live: false, segPromise: null, seg: null, raf: 0, lastTs: 0,
                   hex: null, meanL: null, lut: null, lutKey: "", stillMask: null };
 
 const Y_TO_L = new Float32Array(4096);
@@ -933,16 +1138,20 @@ function setHint(text) {
   h.hidden = !text;
 }
 
-// Lookup table: input L* (half steps) -> output RGB in the target colour
+// Lookup table: input L* (half steps) -> output RGB in the target colour.
+// Shadows lose chroma, highlights wash out towards white, like real fabric. Out-of-gamut colours are
+// pulled in by reducing chroma rather than clipping, which is what made the first version look neon.
 function ensureLut() {
   const key = `${recolor.hex}|${Math.round(recolor.meanL)}`;
   if (key === recolor.lutKey) return;
   const [Lt, at, bt] = hexToLab(recolor.hex);
   const lut = new Uint8ClampedArray(201 * 3);
   for (let k = 0; k <= 200; k++) {
-    const L = clamp(Lt + (k / 2 - recolor.meanL) * 0.9, 0, 100);
-    const s = Lt > 1 ? clamp(L / Lt, 0.4, 1.15) : 1;   // shadows lose some chroma, like real fabric
-    lut.set(labToRgb(L, at * s, bt * s), k * 3);
+    const L = clamp(Lt + (k / 2 - recolor.meanL) * 0.85, 2, 98);
+    const s = L <= Lt
+      ? clamp(L / Math.max(Lt, 1), 0.45, 1)
+      : clamp((100 - L) / Math.max(100 - Lt, 1), 0.25, 1);
+    lut.set(labToRgbInGamut(L, at * s * 0.92, bt * s * 0.92), k * 3);
   }
   recolor.lut = lut;
   recolor.lutKey = key;
@@ -957,7 +1166,7 @@ function paint(ctx, w, h, conf, mw, mh) {
     const row = (mh === h ? y : Math.min(mh - 1, (y * mh / h) | 0)) * mw;
     for (let x = 0; x < w; x++, p++) {
       const c = conf[row + (mw === w ? x : Math.min(mw - 1, (x * mw / w) | 0))];
-      const a = c <= 0.35 ? 0 : c >= 0.75 ? 1 : (c - 0.35) / 0.4;   // soft edges
+      const a = c <= 0.2 ? 0 : c >= 0.55 ? 1 : (c - 0.2) / 0.35;   // soft, slightly widened edges (no dark seam)
       Abuf[p] = a;
       if (a === 0) continue;
       const i = p * 4;
@@ -1064,14 +1273,14 @@ document.querySelectorAll(".mode button").forEach(b => { b.onclick = () => setMo
 $("btnDrape").onclick = async () => {
   const best = currentBest;
   const opp = oppositeOf(best);
-  const chips = (hexes, label) => sortPalette(hexes).map(h =>
-    `<button class="chip" style="--c:${h}" data-hex="${h}" aria-label="${label} ${h}" aria-pressed="false"></button>`).join("");
-  $("chipsMineLabel").textContent = `Deine Palette: ${best.en}`;
-  $("chipsMine").innerHTML = chips(best.palette, best.en);
-  $("chipsOppLabel").textContent = `Zum Vergleich: ${opp.en}`;
-  $("chipsOpp").innerHTML = chips(opp.palette, opp.en);
-  $("chipsMine").setAttribute("aria-label", `Deine Palette: ${best.en}`);
-  $("chipsOpp").setAttribute("aria-label", `Zum Vergleich: ${opp.en}`);
+  const chips = (hexes, group, label) => hexes.map(h =>
+    `<button class="chip" style="--c:${h}" data-hex="${h}" data-group="${group}" aria-label="${label} ${h}" aria-pressed="false"></button>`).join("");
+  $("mineName").textContent = best.en;
+  $("oppName").textContent = opp.en;
+  $("chipsMine").innerHTML = chips(sortColors(best.colors), "mine", best.en);
+  $("chipsBasics").innerHTML = chips(sortBasics(best.basics), "mine", `${best.en}, Basisfarbe`);
+  $("chipsOpp").innerHTML = chips(sortColors(opp.colors), "opp", opp.en);
+  drapeSel.mine = drapeSel.opp = drapeSel.showing = null;
 
   const useVideo = state.fromCamera && await startCamera();
   recolor.live = useVideo;
@@ -1080,14 +1289,14 @@ $("btnDrape").onclick = async () => {
   if (useVideo) $("drapeVideo").play().catch(() => {});
   else $("drapeImg").src = state.src.toDataURL("image/jpeg", 0.9);
 
-  setDrape(sortPalette(best.palette)[0]);
   show("drape");
+  setDrape(sortColors(best.colors)[0], "mine");
   setMode(recolor.mode);
 };
 
 document.querySelector("#drape").addEventListener("click", e => {
   const ch = e.target.closest(".chip");
-  if (ch) setDrape(ch.dataset.hex);
+  if (ch) setDrape(ch.dataset.hex, ch.dataset.group);
 });
 $("btnDrapeBack").onclick = () => {
   cancelAnimationFrame(recolor.raf);
