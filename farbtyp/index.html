@@ -79,7 +79,8 @@
 
   /* Camera stage */
   .stage { position: relative; width: 100%; aspect-ratio: 3 / 4; max-height: 66vh; border-radius: 22px; overflow: hidden; background: #000; margin-top: 8px; }
-  .stage video, .stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .stage video, .stage img, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .stage canvas { display: none; }
   .mirror { transform: scaleX(-1); }
   .oval {
     position: absolute; left: 50%; top: 42%; width: 62%; height: 72%;
@@ -140,6 +141,9 @@
   .tune .row { display: flex; justify-content: space-between; gap: 10px; }
 
   /* Draping */
+  .mode { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; padding: 3px; margin: 4px 0 10px; }
+  .mode button { border: 0; background: transparent; color: var(--ink); padding: 8px 18px; border-radius: 999px; font-weight: 600; }
+  .mode button[aria-checked="true"] { background: var(--ink); color: var(--on-ink); }
   .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 4px; }
   .chip { width: 42px; height: 42px; border-radius: 50%; background: var(--c); border: 1px solid var(--line); padding: 0; }
   .chip[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 3px; }
@@ -173,7 +177,7 @@
       <input type="file" id="fileInput" accept="image/*" hidden>
     </div>
     <p class="muted" id="modelStatus" role="status">Erkennung wird geladen …</p>
-    <p class="muted">Alles läuft lokal im Browser, es werden keine Bilder hochgeladen. Die Farbtypenlehre ist eine Spielerei und nicht wissenschaftlich belegt.</p>
+    <p class="muted">Alles läuft lokal im Browser, es werden keine Bilder hochgeladen.</p>
   </section>
 
   <!-- Camera -->
@@ -254,11 +258,17 @@
   <!-- Draping -->
   <section id="drape" class="screen" aria-labelledby="h-drape">
     <h2 id="h-drape" tabindex="-1">Farben testen</h2>
-    <p>Achte darauf, ob dein Gesicht frischer oder fahler wirkt und ob Schatten unter den Augen stärker werden.</p>
+    <div class="mode" role="radiogroup" aria-label="Darstellung">
+      <button role="radio" aria-checked="true" data-mode="frame">Rahmen</button>
+      <button role="radio" aria-checked="false" data-mode="shirt">Oberteil</button>
+    </div>
+    <p id="drapeText"></p>
     <div class="stage">
       <video id="drapeVideo" class="mirror" playsinline muted autoplay></video>
       <img id="drapeImg" alt="">
+      <canvas id="recolorCanvas" aria-label="Kamerabild mit umgefärbtem Oberteil"></canvas>
       <div class="drape" id="drapeLayer"></div>
+      <div class="stage-hint" id="recolorHint" hidden></div>
     </div>
     <div class="chip-group">
       <p class="muted" id="chipsMineLabel"></p>
@@ -322,7 +332,7 @@ function linToLab(r, g, b) {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
 
-function labToHex(L, a, b) {
+function labToRgb(L, a, b) {
   const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
   const finv = t => (t ** 3 > EPS ? t ** 3 : (116 * t - 16) / KAPPA);
   const X = finv(fx) * 0.95047, Y = L > 8 ? fy ** 3 : L / KAPPA, Z = finv(fz) * 1.08883;
@@ -331,7 +341,11 @@ function labToHex(L, a, b) {
     -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z,
     0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
   ];
-  return "#" + lin.map(c => LIN_TO_SRGB[Math.round(clamp(c, 0, 1) * 4095)].toString(16).padStart(2, "0")).join("");
+  return lin.map(c => LIN_TO_SRGB[Math.round(clamp(c, 0, 1) * 4095)]);
+}
+
+function labToHex(L, a, b) {
+  return "#" + labToRgb(L, a, b).map(v => v.toString(16).padStart(2, "0")).join("");
 }
 
 function hexToLab(hex) {
@@ -504,7 +518,7 @@ async function loadModels() {
   } catch (e) {
     console.warn("Segmenter unavailable, falling back to region sampling", e);
   }
-  return { face, seg };
+  return { face, seg, vision, files };
 }
 
 state.models = loadModels();
@@ -553,6 +567,7 @@ function setSource(canvas) {
   state.srcData = canvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
   state.gains = [1, 1, 1];
   state.white = null;
+  recolor.stillMask = null;
   const cc = $("calibCanvas");
   cc.width = canvas.width;
   cc.height = canvas.height;
@@ -870,10 +885,181 @@ function drawDebug() {
 // ---------------------------------------------------------------------------
 // Draping
 // ---------------------------------------------------------------------------
+const DRAPE_TEXT = {
+  frame: "Achte darauf, ob dein Gesicht frischer oder fahler wirkt und ob Schatten unter den Augen stärker werden.",
+  shirt: "Dein Oberteil wird in die gewählte Farbe umgefärbt, Falten und Schatten bleiben erhalten. Schultern und Oberkörper sollten im Bild sein.",
+};
+
 function setDrape(hex) {
+  recolor.hex = hex;
   $("drapeLayer").style.setProperty("--drape", hex);
   document.querySelectorAll(".chip").forEach(ch => ch.setAttribute("aria-pressed", ch.dataset.hex === hex ? "true" : "false"));
+  if (recolor.mode === "shirt" && !recolor.live) renderStill();
 }
+
+// ---------------------------------------------------------------------------
+// Live recolouring of clothing (segmenter class 4)
+// Keeps each pixel's lightness (folds, seams, shadows) and swaps hue and chroma.
+// ---------------------------------------------------------------------------
+const SEG_CLOTHES = 4;
+const RECOLOR_MAX = 640;
+const recolor = { mode: "frame", live: false, segPromise: null, seg: null, raf: 0, lastTs: 0,
+                  hex: null, meanL: null, lut: null, lutKey: "", stillMask: null };
+
+const Y_TO_L = new Float32Array(4096);
+for (let i = 0; i < 4096; i++) { const y = i / 4095; Y_TO_L[i] = y > EPS ? 116 * Math.cbrt(y) - 16 : KAPPA * y; }
+
+let Lbuf = null, Abuf = null;
+
+function getRecolorSegmenter() {
+  if (!recolor.segPromise) {
+    recolor.segPromise = (async () => {
+      const { vision, files } = await state.models;
+      const opts = delegate => ({
+        baseOptions: { modelAssetPath: SEG_MODEL, delegate },
+        runningMode: "VIDEO", outputCategoryMask: false, outputConfidenceMasks: true,
+      });
+      try { return await vision.ImageSegmenter.createFromOptions(files, opts("GPU")); }
+      catch (e) { console.warn("GPU segmenter failed, using CPU", e); return vision.ImageSegmenter.createFromOptions(files, opts("CPU")); }
+    })();
+    recolor.segPromise.catch(() => { recolor.segPromise = null; });
+  }
+  return recolor.segPromise;
+}
+
+function setHint(text) {
+  const h = $("recolorHint");
+  if (h.textContent !== text) h.textContent = text;
+  h.hidden = !text;
+}
+
+// Lookup table: input L* (half steps) -> output RGB in the target colour
+function ensureLut() {
+  const key = `${recolor.hex}|${Math.round(recolor.meanL)}`;
+  if (key === recolor.lutKey) return;
+  const [Lt, at, bt] = hexToLab(recolor.hex);
+  const lut = new Uint8ClampedArray(201 * 3);
+  for (let k = 0; k <= 200; k++) {
+    const L = clamp(Lt + (k / 2 - recolor.meanL) * 0.9, 0, 100);
+    const s = Lt > 1 ? clamp(L / Lt, 0.4, 1.15) : 1;   // shadows lose some chroma, like real fabric
+    lut.set(labToRgb(L, at * s, bt * s), k * 3);
+  }
+  recolor.lut = lut;
+  recolor.lutKey = key;
+}
+
+function paint(ctx, w, h, conf, mw, mh) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data, n = w * h;
+  if (!Lbuf || Lbuf.length !== n) { Lbuf = new Float32Array(n); Abuf = new Float32Array(n); }
+  let sum = 0, cnt = 0;
+  for (let y = 0, p = 0; y < h; y++) {
+    const row = (mh === h ? y : Math.min(mh - 1, (y * mh / h) | 0)) * mw;
+    for (let x = 0; x < w; x++, p++) {
+      const c = conf[row + (mw === w ? x : Math.min(mw - 1, (x * mw / w) | 0))];
+      const a = c <= 0.35 ? 0 : c >= 0.75 ? 1 : (c - 0.35) / 0.4;   // soft edges
+      Abuf[p] = a;
+      if (a === 0) continue;
+      const i = p * 4;
+      const Y = 0.2126729 * SRGB_TO_LIN[d[i]] + 0.7151522 * SRGB_TO_LIN[d[i + 1]] + 0.0721750 * SRGB_TO_LIN[d[i + 2]];
+      const L = Y_TO_L[Math.min(4095, (Y * 4095) | 0)];
+      Lbuf[p] = L;
+      if (a > 0.5) { sum += L; cnt++; }
+    }
+  }
+  if (cnt < n * 0.01) {
+    setHint("Kein Oberteil erkannt. Geh etwas zurück, damit Schultern und Oberkörper im Bild sind.");
+    return;
+  }
+  const m = sum / cnt;
+  recolor.meanL = recolor.meanL == null ? m : recolor.meanL * 0.85 + m * 0.15;
+  setHint(recolor.meanL < 25 ? "Tipp: Ein helles, unifarbenes Oberteil wirkt beim Umfärben am echtesten." : "");
+  ensureLut();
+  const lut = recolor.lut;
+  for (let p = 0; p < n; p++) {
+    const a = Abuf[p];
+    if (a === 0) continue;
+    const i = p * 4, k = Math.round(Lbuf[p] * 2) * 3;
+    d[i] += (lut[k] - d[i]) * a;
+    d[i + 1] += (lut[k + 1] - d[i + 1]) * a;
+    d[i + 2] += (lut[k + 2] - d[i + 2]) * a;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function nextTs() {
+  recolor.lastTs = Math.max(performance.now(), recolor.lastTs + 1);
+  return recolor.lastTs;
+}
+
+function liveLoop() {
+  const v = $("drapeVideo"), c = $("recolorCanvas");
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  const tick = () => {
+    if (recolor.mode !== "shirt" || !$("drape").classList.contains("active")) { recolor.raf = 0; return; }
+    if (v.readyState >= 2 && v.videoWidth) {
+      const s = Math.min(1, RECOLOR_MAX / Math.max(v.videoWidth, v.videoHeight));
+      const w = Math.round(v.videoWidth * s), h = Math.round(v.videoHeight * s);
+      if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+      ctx.setTransform(-1, 0, 0, 1, w, 0);
+      ctx.drawImage(v, 0, 0, w, h);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      try {
+        const res = recolor.seg.segmentForVideo(c, nextTs());
+        const mask = res.confidenceMasks?.[SEG_CLOTHES];
+        if (mask) paint(ctx, w, h, mask.getAsFloat32Array(), mask.width, mask.height);
+        res.close?.();
+      } catch (e) { console.warn(e); }
+    }
+    recolor.raf = requestAnimationFrame(tick);
+  };
+  if (!recolor.raf) recolor.raf = requestAnimationFrame(tick);
+}
+
+function renderStill() {
+  if (!recolor.seg || !state.src) return;
+  const c = $("recolorCanvas"), src = state.src;
+  const s = Math.min(1, 960 / Math.max(src.width, src.height));
+  const w = Math.round(src.width * s), h = Math.round(src.height * s);
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(src, 0, 0, w, h);
+  if (!recolor.stillMask) {
+    const res = recolor.seg.segmentForVideo(c, nextTs());
+    const mask = res.confidenceMasks?.[SEG_CLOTHES];
+    recolor.stillMask = mask ? { arr: mask.getAsFloat32Array().slice(), w: mask.width, h: mask.height } : null;
+    res.close?.();
+  }
+  if (!recolor.stillMask) { setHint("Kein Oberteil erkannt."); return; }
+  recolor.meanL = null;
+  paint(ctx, w, h, recolor.stillMask.arr, recolor.stillMask.w, recolor.stillMask.h);
+}
+
+async function setMode(mode) {
+  recolor.mode = mode;
+  document.querySelectorAll(".mode button").forEach(b => b.setAttribute("aria-checked", b.dataset.mode === mode ? "true" : "false"));
+  const shirt = mode === "shirt";
+  $("drapeText").textContent = DRAPE_TEXT[mode];
+  $("recolorCanvas").style.display = shirt ? "block" : "none";
+  $("drapeLayer").style.display = shirt ? "none" : "block";
+  if (!shirt) { cancelAnimationFrame(recolor.raf); recolor.raf = 0; setHint(""); return; }
+
+  setHint("Umfärben wird vorbereitet …");
+  try {
+    recolor.seg = await getRecolorSegmenter();
+  } catch (e) {
+    console.error(e);
+    toast("Die Kleidungserkennung konnte nicht geladen werden.");
+    setMode("frame");
+    return;
+  }
+  if (recolor.mode !== "shirt") return;
+  recolor.meanL = null;
+  if (recolor.live) liveLoop();
+  else renderStill();
+}
+
+document.querySelectorAll(".mode button").forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
 
 $("btnDrape").onclick = async () => {
   const best = currentBest;
@@ -888,6 +1074,7 @@ $("btnDrape").onclick = async () => {
   $("chipsOpp").setAttribute("aria-label", `Zum Vergleich: ${opp.en}`);
 
   const useVideo = state.fromCamera && await startCamera();
+  recolor.live = useVideo;
   $("drapeVideo").style.display = useVideo ? "block" : "none";
   $("drapeImg").style.display = useVideo ? "none" : "block";
   if (useVideo) $("drapeVideo").play().catch(() => {});
@@ -895,13 +1082,18 @@ $("btnDrape").onclick = async () => {
 
   setDrape(sortPalette(best.palette)[0]);
   show("drape");
+  setMode(recolor.mode);
 };
 
 document.querySelector("#drape").addEventListener("click", e => {
   const ch = e.target.closest(".chip");
   if (ch) setDrape(ch.dataset.hex);
 });
-$("btnDrapeBack").onclick = () => show("result");
+$("btnDrapeBack").onclick = () => {
+  cancelAnimationFrame(recolor.raf);
+  recolor.raf = 0;
+  show("result");
+};
 </script>
 </body>
 </html>
