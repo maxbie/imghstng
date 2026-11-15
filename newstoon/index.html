@@ -54,9 +54,10 @@
     margin: 0;
     font-family: var(--brand);
     font-weight: 400;
-    font-size: clamp(1.35rem, 3vw, 1.9rem);
+    font-size: clamp(1.2rem, 2.7vw, 1.7rem);
     line-height: 1;
-    letter-spacing: 0;
+    letter-spacing: .02em;
+    text-transform: uppercase;
   }
   .kana {
     font-family: var(--kana);
@@ -99,7 +100,6 @@
   .btn.icon { width: 40px; padding: 0; }
   .btn.icon svg { width: 18px; height: 18px; }
   .btn.all { margin-left: 8px; }
-  .btn.current[aria-pressed="true"] { color: var(--signal); }
   .btn .dot {
     position: absolute; top: 2px; right: 2px;
     width: 10px; height: 10px; border-radius: 50%;
@@ -350,8 +350,7 @@
     btnNewer.disabled = isLatest;
     btnOlder.disabled = current === items.length - 1;
     btnAll.disabled = false;
-    btnCurrent.disabled = false;
-    btnCurrent.setAttribute("aria-pressed", isLatest ? "true" : "false");
+    btnCurrent.disabled = isLatest;
     btnCurrent.querySelector(".dot")?.remove();
     if (hasNew) {
       const dot = document.createElement("span");
