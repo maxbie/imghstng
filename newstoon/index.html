@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='black'/><rect x='8' y='8' width='84' height='84' fill='none' stroke='%23FFE600' stroke-width='10'/><text x='50' y='70' font-size='56' text-anchor='middle' fill='white' font-family='monospace' font-weight='900'>N</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Train+One&family=Tomorrow:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Krona+One&family=Tektur:wght@400;500;600&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #000000;
@@ -21,8 +21,9 @@
     --shadow: 8px;
     --chrome: 150px;  /* header height plus spacing, used to fit the panel into the viewport */
     --pw: min(1280px, calc(100vw - 32px - var(--shadow)), calc((100dvh - var(--chrome)) * 16 / 9));
-    --brand: "Train One", "Hiragino Sans", "Arial Black", sans-serif;
-    --ui: "Tomorrow", "Helvetica Neue", Arial, sans-serif;
+    --brand: "Krona One", "Arial Black", sans-serif;
+    --kana: "Dela Gothic One", "Hiragino Sans", sans-serif;
+    --ui: "Tektur", "Helvetica Neue", Arial, sans-serif;
     --pill: #262626;
     --pill-hover: #363636;
     color-scheme: dark;
@@ -53,12 +54,12 @@
     margin: 0;
     font-family: var(--brand);
     font-weight: 400;
-    font-size: clamp(1.7rem, 3.8vw, 2.3rem);
+    font-size: clamp(1.35rem, 3vw, 1.9rem);
     line-height: 1;
-    letter-spacing: .01em;
+    letter-spacing: 0;
   }
   .kana {
-    font-family: var(--brand);
+    font-family: var(--kana);
     font-size: .8rem;
     line-height: 1;
     padding: 4px 6px;
@@ -111,7 +112,6 @@
     position: relative;
     margin: 0;
     aspect-ratio: 16 / 9;
-    border: var(--frame) solid var(--ink);
     background: var(--surface);
     box-shadow: var(--shadow) var(--shadow) 0 var(--signal);
     overflow: hidden;
@@ -162,13 +162,13 @@
   .entry {
     display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 14px;
     width: 100%; padding: 6px; margin: 0 0 6px;
-    background: none; border: 2px solid transparent; cursor: pointer; text-align: left;
+    background: none; border: 0; cursor: pointer; text-align: left;
   }
-  .entry:hover { border-color: var(--muted); }
-  .entry .thumb { aspect-ratio: 16 / 9; border: 2px solid var(--muted); background: var(--surface); overflow: hidden; }
+  .entry .thumb { aspect-ratio: 16 / 9; background: var(--surface); overflow: hidden; opacity: .75; transition: opacity .12s; }
+  .entry:hover .thumb { opacity: 1; }
   .entry img { width: 100%; height: 100%; object-fit: cover; }
   .entry .time { font-family: var(--ui); font-size: 1rem; }
-  .entry[aria-current="true"] .thumb { border-color: var(--ink); box-shadow: 4px 4px 0 var(--signal); }
+  .entry[aria-current="true"] .thumb { opacity: 1; box-shadow: 4px 4px 0 var(--signal); }
   .entry[aria-current="true"] .time { background: var(--signal); color: #000; padding: 0 4px; justify-self: start; }
 
   @media (max-width: 700px) {
@@ -221,7 +221,9 @@
         <button class="btn icon" id="newer" type="button" disabled aria-label="Neuere Ausgabe">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
         </button>
-        <button class="btn all" id="all" type="button" disabled aria-haspopup="dialog">Alle</button>
+        <button class="btn icon all" id="all" type="button" disabled aria-haspopup="dialog" aria-label="Alle Ausgaben" title="Alle Ausgaben">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.3"/><path d="M3 3.5V8.3h4.8"/><path d="M12 7.5V12l3 2"/></svg>
+        </button>
       </nav>
     </div>
   </header>
