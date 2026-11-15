@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Newstoon – die tägliche News als Manga</title>
+<meta name="description" content="Jeden Tag eine Meldung von SRF News als Manga-Panel. Mit Archiv aller bisherigen Ausgaben.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='black'/><rect x='8' y='8' width='84' height='84' fill='none' stroke='%23FFE600' stroke-width='10'/><text x='50' y='70' font-size='56' text-anchor='middle' fill='white' font-family='monospace' font-weight='900'>N</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #161616;
+    --ink: #f2f2f2;
+    --muted: #9a9a9a;
+    --dots: #2c2c2c;
+    --signal: #ffe600;
+    --frame: 5px;
+    --shadow: 10px;
+    --pixel: "DotGothic16", "Courier New", monospace;
+    --ui: "Chakra Petch", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 17px;
+    line-height: 1.5;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+  img { max-width: 100%; display: block; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
+
+  .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+  /* Header */
+  header { padding: 28px 0 20px; }
+  .masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .wordmark {
+    font-family: var(--pixel);
+    font-weight: 400;
+    font-size: clamp(2.6rem, 10vw, 6.2rem);
+    line-height: .9;
+    letter-spacing: .02em;
+    margin: 0;
+  }
+  .kana {
+    font-family: var(--pixel);
+    writing-mode: vertical-rl;
+    font-size: clamp(1rem, 2.4vw, 1.45rem);
+    line-height: 1;
+    margin: 0;
+    padding: 8px 6px 10px;
+    background: var(--signal);
+    color: #000;
+  }
+  .intro { margin: 14px 0 0; max-width: 56ch; color: var(--muted); }
+
+  /* Current panel */
+  main { padding-bottom: 32px; }
+  .stage { margin: 8px var(--shadow) 0 0; }
+  .panel {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 16 / 9;
+    border: var(--frame) solid var(--ink);
+    background: var(--surface);
+    box-shadow: var(--shadow) var(--shadow) 0 var(--signal);
+    overflow: hidden;
+  }
+  .panel a { display: block; height: 100%; }
+  .panel img { width: 100%; height: 100%; object-fit: cover; }
+  .panel .msg {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    padding: 24px; text-align: center;
+    font-family: var(--pixel);
+    color: var(--muted);
+  }
+
+  .caption {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px 20px;
+    margin-top: calc(var(--shadow) + 18px);
+  }
+  .stamp { margin: 0; }
+  .stamp time {
+    display: block;
+    font-family: var(--pixel);
+    font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+    line-height: 1.25;
+  }
+  .stamp span { color: var(--muted); font-size: .95rem; }
+
+  .nav { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    border: 2px solid var(--ink);
+    background: var(--bg);
+    padding: 8px 16px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+  .btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
+  .btn.primary { background: var(--signal); border-color: var(--signal); color: #000; box-shadow: 4px 4px 0 var(--ink); }
+
+  /* Timeline */
+  .archive { padding: 40px 0 12px; }
+  .archive h2 {
+    font-family: var(--pixel);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 4vw, 2.1rem);
+    margin: 0 0 4px;
+  }
+  .archive p { margin: 0 0 16px; color: var(--muted); }
+
+  .strip {
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--dots) 1.6px, transparent 1.7px);
+    background-size: 9px 9px;
+    border-block: 2px solid var(--ink);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .days { display: flex; gap: 28px; padding: 18px 16px 22px; width: max-content; }
+  .day { display: flex; flex-direction: column; gap: 8px; }
+  .day h3 {
+    margin: 0; font-family: var(--pixel); font-size: .95rem; font-weight: 400;
+    background: var(--bg); align-self: flex-start; padding: 0 6px;
+    border: 2px solid var(--ink);
+  }
+  .shots { display: flex; gap: 12px; }
+  .shot {
+    scroll-snap-align: start;
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  }
+  .shot .thumb {
+    width: 176px; aspect-ratio: 16 / 9;
+    border: 2px solid var(--muted);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .shot:hover .thumb { border-color: var(--ink); }
+  .shot img { width: 100%; height: 100%; object-fit: cover; }
+  .shot .time { font-family: var(--pixel); font-size: .9rem; background: var(--bg); align-self: flex-start; padding: 0 4px; }
+  .shot[aria-current="true"] .thumb { border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--signal); }
+  .shot[aria-current="true"] .time { background: var(--signal); color: #000; }
+
+  footer { padding: 28px 0 40px; color: var(--muted); font-size: .95rem; }
+  footer strong { color: var(--ink); font-weight: 600; }
+  @media (hover: none) { .keys { display: none; } }
+
+  @media (max-width: 600px) {
+    :root { --frame: 4px; --shadow: 6px; }
+    header { padding-top: 20px; }
+    .nav { width: 100%; }
+    .nav .btn { flex: 1; }
+    .shot .thumb { width: 136px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <header class="wrap">
+    <div class="masthead">
+      <h1 class="wordmark">Newstoon</h1>
+      <p class="kana" aria-hidden="true">ニューストゥーン</p>
+    </div>
+    <p class="intro">Jeden Tag eine Meldung von SRF News, gezeichnet als Manga-Panel. Text und Bild entstehen automatisch mit KI.</p>
+  </header>
+
+  <main class="wrap">
+    <div class="stage">
+      <figure class="panel" id="panel">
+        <div class="msg">Lade die aktuelle Ausgabe …</div>
+      </figure>
+    </div>
+
+    <div class="caption">
+      <p class="stamp" id="stamp" aria-live="polite"></p>
+      <div class="nav">
+        <button class="btn" id="older" type="button" disabled>Ältere</button>
+        <button class="btn" id="newer" type="button" disabled>Neuere</button>
+        <button class="btn primary" id="latest" type="button" hidden>Zur aktuellen</button>
+      </div>
+    </div>
+
+    <section class="archive" aria-labelledby="archive-title">
+      <h2 id="archive-title">Archiv</h2>
+      <p id="count">Alle bisherigen Ausgaben, die neueste zuerst.</p>
+      <div class="strip" id="strip" tabindex="0" aria-label="Zeitleiste aller Ausgaben">
+        <div class="days" id="days"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    Ein Projekt von <strong>@improvedlaziness</strong>. Neue Ausgaben erscheinen automatisch.<span class="keys"> Mit den Pfeiltasten ← → blätterst du durch die Ausgaben.</span>
+  </footer>
+
+<script>
+(() => {
+  const REPO = "maxbie/imghstng";
+  const DIR = "newstoon";
+  const API = `https://api.github.com/repos/${REPO}/contents/${DIR}?ref=main`;
+  const PATTERN = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})\.jpg$/;
+  const REFRESH_MS = 10 * 60 * 1000;   // check every 10 minutes
+  const MIN_GAP_MS = 60 * 1000;         // at most once a minute when the tab regains focus
+
+  const $ = (id) => document.getElementById(id);
+  const panel = $("panel"), stamp = $("stamp"), days = $("days");
+  const btnOlder = $("older"), btnNewer = $("newer"), btnLatest = $("latest");
+
+  const fmtDay = new Intl.DateTimeFormat("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const fmtDayShort = new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  const fmtTime = new Intl.DateTimeFormat("de-CH", { hour: "2-digit", minute: "2-digit" });
+
+  let items = [];
+  let current = 0;
+  let etag = null;
+  let lastCheck = 0;
+  let hasNew = false;
+
+  function showMessage(text) {
+    panel.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "msg";
+    div.textContent = text;
+    panel.appendChild(div);
+  }
+
+  function updateLatestButton() {
+    const isLatest = current === 0;
+    btnLatest.hidden = isLatest;
+    btnLatest.textContent = hasNew ? "Neue Ausgabe ansehen" : "Zur aktuellen";
+    if (isLatest) hasNew = false;
+  }
+
+  function select(index, { scroll = true, updateHash = true } = {}) {
+    if (!items.length) return;
+    current = Math.max(0, Math.min(index, items.length - 1));
+    const item = items[current];
+
+    panel.innerHTML = "";
+    const link = document.createElement("a");
+    link.href = item.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.title = "Bild in voller Grösse öffnen";
+    const img = document.createElement("img");
+    img.src = item.url;
+    img.alt = `Newstoon vom ${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr`;
+    img.decoding = "async";
+    img.onerror = () => showMessage("Dieses Bild konnte nicht geladen werden. Versuche es in ein paar Minuten nochmals.");
+    link.appendChild(img);
+    panel.appendChild(link);
+
+    const isLatest = current === 0;
+    stamp.innerHTML = "";
+    const time = document.createElement("time");
+    time.dateTime = item.date.toISOString();
+    time.textContent = `${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr`;
+    const sub = document.createElement("span");
+    sub.textContent = isLatest ? "Aktuelle Ausgabe" : `Ausgabe ${items.length - current} von ${items.length}`;
+    stamp.append(time, sub);
+
+    btnNewer.disabled = isLatest;
+    btnOlder.disabled = current === items.length - 1;
+    updateLatestButton();
+
+    days.querySelectorAll(".shot").forEach((el) => {
+      const active = Number(el.dataset.index) === current;
+      el.setAttribute("aria-current", active ? "true" : "false");
+      if (active && scroll) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", inline: "center", block: "nearest" });
+    });
+
+    if (updateHash) {
+      const hash = isLatest ? "" : "#" + item.id;
+      history.replaceState(null, "", location.pathname + location.search + hash);
+    }
+  }
+
+  function renderTimeline() {
+    days.innerHTML = "";
+    let shots = null, lastKey = "";
+    items.forEach((item, i) => {
+      const key = item.name.slice(0, 10);
+      if (key !== lastKey) {
+        lastKey = key;
+        const group = document.createElement("div");
+        group.className = "day";
+        const h = document.createElement("h3");
+        h.textContent = fmtDayShort.format(item.date);
+        shots = document.createElement("div");
+        shots.className = "shots";
+        group.append(h, shots);
+        days.appendChild(group);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "shot";
+      btn.dataset.index = i;
+      btn.setAttribute("aria-label", `Ausgabe vom ${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr anzeigen`);
+      const thumb = document.createElement("span");
+      thumb.className = "thumb";
+      const img = document.createElement("img");
+      img.src = item.url;
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      thumb.appendChild(img);
+      const t = document.createElement("span");
+      t.className = "time";
+      t.textContent = fmtTime.format(item.date);
+      btn.append(thumb, t);
+      btn.addEventListener("click", () => select(i));
+      shots.appendChild(btn);
+    });
+    $("count").textContent = items.length === 1
+      ? "Bisher gibt es eine Ausgabe."
+      : `Alle ${items.length} bisherigen Ausgaben, die neueste zuerst.`;
+  }
+
+  function indexFromHash() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const i = items.findIndex((it) => it.id === id);
+    return i >= 0 ? i : 0;
+  }
+
+  function parse(files) {
+    return files
+      .filter((f) => f.type === "file" && PATTERN.test(f.name))
+      .map((f) => {
+        const [, y, mo, d, h, mi, s] = f.name.match(PATTERN);
+        return {
+          id: f.name.replace(/\.jpg$/, ""),
+          name: f.name,
+          url: f.download_url,
+          date: new Date(+y, +mo - 1, +d, +h, +mi, +s)
+        };
+      })
+      .sort((a, b) => b.date - a.date);
+  }
+
+  async function load({ initial = false } = {}) {
+    lastCheck = Date.now();
+    const headers = { Accept: "application/vnd.github+json" };
+    if (etag) headers["If-None-Match"] = etag;   // 304 answers don't count against the rate limit
+
+    let res;
+    try {
+      res = await fetch(API, { headers, cache: "no-store" });
+    } catch {
+      if (initial) showMessage("Die Ausgaben konnten nicht geladen werden. Lade die Seite neu.");
+      return;
+    }
+    if (res.status === 304) return;
+    if (!res.ok) {
+      if (initial) {
+        showMessage(res.status === 403 || res.status === 429
+          ? "GitHub lässt gerade keine weiteren Abfragen zu. Lade die Seite in einer Stunde neu."
+          : "Die Ausgaben konnten nicht geladen werden. Lade die Seite neu.");
+      }
+      return;
+    }
+    etag = res.headers.get("ETag") || etag;
+    const next = parse(await res.json());
+
+    if (!next.length) {
+      if (initial) showMessage("Noch keine Ausgabe vorhanden. Die erste erscheint hier, sobald sie hochgeladen ist.");
+      return;
+    }
+
+    if (initial) {
+      items = next;
+      renderTimeline();
+      select(indexFromHash(), { updateHash: false });
+      return;
+    }
+
+    // Refresh: only redraw if the newest issue changed
+    if (items.length && next[0].id === items[0].id && next.length === items.length) return;
+
+    const viewingLatest = current === 0;
+    const viewedId = items[current] && items[current].id;
+    items = next;
+    renderTimeline();
+
+    if (viewingLatest) {
+      select(0, { updateHash: false });
+    } else {
+      hasNew = true;
+      const keep = items.findIndex((it) => it.id === viewedId);
+      select(keep >= 0 ? keep : 0, { scroll: false, updateHash: false });
+    }
+  }
+
+  btnOlder.addEventListener("click", () => select(current + 1));
+  btnNewer.addEventListener("click", () => select(current - 1));
+  btnLatest.addEventListener("click", () => select(0));
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); select(current + 1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); select(current - 1); }
+  });
+  window.addEventListener("hashchange", () => select(indexFromHash(), { updateHash: false }));
+
+  // Swipe on the main panel: left = older, right = newer
+  let touchX = null;
+  panel.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  panel.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 50) select(current + (dx < 0 ? 1 : -1));
+  });
+
+  // Auto refresh: every 10 minutes while visible, and when the tab comes back into view
+  setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Date.now() - lastCheck > MIN_GAP_MS) load();
+  });
+
+  load({ initial: true });
+})();
+</script>
+</body>
+</html>
