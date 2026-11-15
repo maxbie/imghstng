@@ -18,7 +18,7 @@
     --muted: #9a9a9a;
     --signal: #ffe600;
     --frame: 4px;
-    --shadow: 8px;
+    --shadow: 0px;
     --chrome: 150px;  /* header height plus spacing, used to fit the panel into the viewport */
     --pw: min(1280px, calc(100vw - 32px - var(--shadow)), calc((100dvh - var(--chrome)) * 16 / 9));
     --brand: "Krona One", "Arial Black", sans-serif;
@@ -113,7 +113,6 @@
     margin: 0;
     aspect-ratio: 16 / 9;
     background: var(--surface);
-    box-shadow: var(--shadow) var(--shadow) 0 var(--signal);
     overflow: hidden;
     touch-action: pan-y;
   }
@@ -168,11 +167,17 @@
   .entry:hover .thumb { opacity: 1; }
   .entry img { width: 100%; height: 100%; object-fit: cover; }
   .entry .time { font-family: var(--ui); font-size: 1rem; }
-  .entry[aria-current="true"] .thumb { opacity: 1; box-shadow: 4px 4px 0 var(--signal); }
+  .entry { position: relative; }
+  .entry[aria-current="true"] { background: var(--pill); }
+  .entry[aria-current="true"]::before {
+    content: ""; position: absolute; left: -20px; top: 0; bottom: 0;
+    width: 4px; background: var(--signal);
+  }
+  .entry[aria-current="true"] .thumb { opacity: 1; }
   .entry[aria-current="true"] .time { background: var(--signal); color: #000; padding: 0 4px; justify-self: start; }
 
   @media (max-width: 700px) {
-    :root { --chrome: 200px; --shadow: 6px; }
+    :root { --chrome: 200px; }
     .row2 { flex-direction: column; align-items: stretch; }
     .nav .btn.current { flex: 1; }
     .drawer {
