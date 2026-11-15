@@ -16,57 +16,88 @@
     --surface: #161616;
     --ink: #f2f2f2;
     --muted: #9a9a9a;
-    --dots: #2c2c2c;
     --signal: #ffe600;
-    --frame: 5px;
-    --shadow: 10px;
+    --frame: 4px;
+    --shadow: 8px;
+    --chrome: 150px;  /* header height plus spacing, used to fit the panel into the viewport */
+    --pw: min(1280px, calc(100vw - 32px - var(--shadow)), calc((100dvh - var(--chrome)) * 16 / 9));
     --pixel: "DotGothic16", "Courier New", monospace;
     --ui: "Chakra Petch", "Helvetica Neue", Arial, sans-serif;
     color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  html, body { margin: 0; min-height: 100%; }
   body {
     background: var(--bg);
     color: var(--ink);
     font-family: var(--ui);
-    font-size: 17px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.45;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
-  img { max-width: 100%; display: block; }
+  img { display: block; max-width: 100%; }
   button { font: inherit; color: inherit; }
+  a { color: inherit; }
   :focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
 
-  .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+  .wrap { width: var(--pw); margin-inline: auto; }
 
   /* Header */
-  header { padding: 28px 0 20px; }
-  .masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .top { padding: 18px 0 16px; }
+  .row1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
   .wordmark {
+    margin: 0;
     font-family: var(--pixel);
     font-weight: 400;
-    font-size: clamp(2.6rem, 10vw, 6.2rem);
-    line-height: .9;
-    letter-spacing: .02em;
-    margin: 0;
+    font-size: clamp(1.5rem, 3.4vw, 2rem);
+    line-height: 1;
+    letter-spacing: .03em;
   }
   .kana {
     font-family: var(--pixel);
-    writing-mode: vertical-rl;
-    font-size: clamp(1rem, 2.4vw, 1.45rem);
+    font-size: .8rem;
     line-height: 1;
-    margin: 0;
-    padding: 8px 6px 10px;
+    padding: 4px 6px;
     background: var(--signal);
     color: #000;
+    white-space: nowrap;
   }
-  .intro { margin: 14px 0 0; max-width: 56ch; color: var(--muted); }
+  .credit { color: var(--muted); text-decoration: none; font-size: .9rem; }
+  .credit:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 
-  /* Current panel */
-  main { padding-bottom: 32px; }
-  .stage { margin: 8px var(--shadow) 0 0; }
+  .row2 {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px 20px; flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .stamp { margin: 0; font-family: var(--pixel); font-size: clamp(1rem, 2.2vw, 1.3rem); line-height: 1.2; }
+
+  .nav { display: flex; gap: 10px; }
+  .btn {
+    position: relative;
+    border: 2px solid var(--ink);
+    background: var(--bg);
+    padding: 6px 14px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
+  .btn.primary { background: var(--signal); border-color: var(--signal); color: #000; }
+  .btn .dot {
+    position: absolute; top: -6px; right: -6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--signal); border: 2px solid var(--bg);
+  }
+
+  /* Panel */
+  .stage { padding-right: var(--shadow); padding-bottom: calc(var(--shadow) + 16px); }
   .panel {
     position: relative;
     margin: 0;
@@ -75,144 +106,127 @@
     background: var(--surface);
     box-shadow: var(--shadow) var(--shadow) 0 var(--signal);
     overflow: hidden;
+    touch-action: pan-y;
   }
-  .panel a { display: block; height: 100%; }
-  .panel img { width: 100%; height: 100%; object-fit: cover; }
-  .panel .msg {
+  .slide { position: absolute; inset: 0; display: block; box-shadow: 0 0 0 5px var(--bg); }
+  .slide img { width: 100%; height: 100%; object-fit: cover; }
+  .msg {
     position: absolute; inset: 0;
     display: grid; place-items: center;
     padding: 24px; text-align: center;
-    font-family: var(--pixel);
-    color: var(--muted);
+    font-family: var(--pixel); color: var(--muted);
   }
 
-  .caption {
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-    gap: 12px 20px;
-    margin-top: calc(var(--shadow) + 18px);
-  }
-  .stamp { margin: 0; }
-  .stamp time {
-    display: block;
-    font-family: var(--pixel);
-    font-size: clamp(1.2rem, 2.8vw, 1.6rem);
-    line-height: 1.25;
-  }
-  .stamp span { color: var(--muted); font-size: .95rem; }
-
-  .nav { display: flex; gap: 10px; flex-wrap: wrap; }
-  .btn {
-    border: 2px solid var(--ink);
+  /* Drawer: side sheet on wide screens, bottom sheet on phones */
+  .drawer {
+    position: fixed;
+    inset: 0 0 0 auto;
+    margin: 0;
+    width: min(400px, 92vw);
+    height: 100dvh;
+    max-width: none; max-height: none;
+    padding: 0;
+    border: 0;
+    border-left: 2px solid var(--ink);
     background: var(--bg);
-    padding: 8px 16px;
-    font-weight: 600;
-    letter-spacing: .02em;
-    cursor: pointer;
-    box-shadow: 4px 4px 0 var(--ink);
-    transition: transform .08s, box-shadow .08s;
+    color: var(--ink);
+    transform: translateX(0);
+    transition: transform .28s ease, overlay .28s allow-discrete, display .28s allow-discrete;
   }
-  .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
-  .btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
-  .btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
-  .btn.primary { background: var(--signal); border-color: var(--signal); color: #000; box-shadow: 4px 4px 0 var(--ink); }
+  .drawer:not([open]) { transform: translateX(100%); }
+  @starting-style { .drawer[open] { transform: translateX(100%); } }
+  .drawer::backdrop { background: rgba(0, 0, 0, .65); }
 
-  /* Timeline */
-  .archive { padding: 40px 0 12px; }
-  .archive h2 {
-    font-family: var(--pixel);
-    font-weight: 400;
-    font-size: clamp(1.5rem, 4vw, 2.1rem);
-    margin: 0 0 4px;
+  .sheet { display: flex; flex-direction: column; height: 100%; }
+  .sheet-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 20px 14px;
+    border-bottom: 2px solid var(--ink);
   }
-  .archive p { margin: 0 0 16px; color: var(--muted); }
-
-  .strip {
-    background-color: var(--bg);
-    background-image: radial-gradient(var(--dots) 1.6px, transparent 1.7px);
-    background-size: 9px 9px;
-    border-block: 2px solid var(--ink);
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-  }
-  .days { display: flex; gap: 28px; padding: 18px 16px 22px; width: max-content; }
-  .day { display: flex; flex-direction: column; gap: 8px; }
+  .sheet-head h2 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 1.3rem; }
+  .list { overflow-y: auto; padding: 8px 20px 28px; overscroll-behavior: contain; }
   .day h3 {
-    margin: 0; font-family: var(--pixel); font-size: .95rem; font-weight: 400;
-    background: var(--bg); align-self: flex-start; padding: 0 6px;
-    border: 2px solid var(--ink);
+    margin: 18px 0 10px;
+    font-family: var(--pixel); font-weight: 400; font-size: .95rem;
+    display: inline-block; padding: 0 6px; border: 2px solid var(--ink);
   }
-  .shots { display: flex; gap: 12px; }
-  .shot {
-    scroll-snap-align: start;
-    display: flex; flex-direction: column; gap: 6px;
-    padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  .entry {
+    display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 14px;
+    width: 100%; padding: 6px; margin: 0 0 6px;
+    background: none; border: 2px solid transparent; cursor: pointer; text-align: left;
   }
-  .shot .thumb {
-    width: 176px; aspect-ratio: 16 / 9;
-    border: 2px solid var(--muted);
-    background: var(--surface);
-    overflow: hidden;
-  }
-  .shot:hover .thumb { border-color: var(--ink); }
-  .shot img { width: 100%; height: 100%; object-fit: cover; }
-  .shot .time { font-family: var(--pixel); font-size: .9rem; background: var(--bg); align-self: flex-start; padding: 0 4px; }
-  .shot[aria-current="true"] .thumb { border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--signal); }
-  .shot[aria-current="true"] .time { background: var(--signal); color: #000; }
+  .entry:hover { border-color: var(--muted); }
+  .entry .thumb { aspect-ratio: 16 / 9; border: 2px solid var(--muted); background: var(--surface); overflow: hidden; }
+  .entry img { width: 100%; height: 100%; object-fit: cover; }
+  .entry .time { font-family: var(--pixel); font-size: 1rem; }
+  .entry[aria-current="true"] .thumb { border-color: var(--ink); box-shadow: 4px 4px 0 var(--signal); }
+  .entry[aria-current="true"] .time { background: var(--signal); color: #000; padding: 0 4px; justify-self: start; }
 
-  footer { padding: 28px 0 40px; color: var(--muted); font-size: .95rem; }
-  footer strong { color: var(--ink); font-weight: 600; }
-  @media (hover: none) { .keys { display: none; } }
-
-  @media (max-width: 600px) {
-    :root { --frame: 4px; --shadow: 6px; }
-    header { padding-top: 20px; }
-    .nav { width: 100%; }
+  @media (max-width: 700px) {
+    :root { --chrome: 200px; --shadow: 6px; }
+    .row2 { flex-direction: column; align-items: stretch; }
     .nav .btn { flex: 1; }
-    .shot .thumb { width: 136px; }
+    .drawer {
+      inset: auto 0 0 0;
+      width: 100%;
+      height: auto;
+      max-height: 82dvh;
+      border-left: 0;
+      border-top: 2px solid var(--ink);
+    }
+    .drawer:not([open]) { transform: translateY(100%); }
+    @starting-style { .drawer[open] { transform: translateY(100%); } }
+    .sheet { max-height: 82dvh; }
+    .sheet-head::before {
+      content: ""; position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+      width: 44px; height: 4px; background: var(--muted);
+    }
+    .sheet-head { position: relative; padding-top: 22px; }
   }
+
+  @media (max-width: 480px) {
+    .kana { display: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .btn { transition: none; }
+    .btn, .drawer { transition: none; }
   }
 </style>
 </head>
 <body>
-  <header class="wrap">
-    <div class="masthead">
-      <h1 class="wordmark">Newstoon</h1>
-      <p class="kana" aria-hidden="true">ニューストゥーン</p>
+  <header class="top wrap">
+    <div class="row1">
+      <div class="brand">
+        <h1 class="wordmark">Newstoon</h1>
+        <span class="kana" aria-hidden="true">ニューストゥーン</span>
+      </div>
+      <a class="credit" href="https://www.instagram.com/improvedlaziness/" target="_blank" rel="noopener">@improvedlaziness</a>
     </div>
-    <p class="intro">Jeden Tag eine Meldung von SRF News, gezeichnet als Manga-Panel. Text und Bild entstehen automatisch mit KI.</p>
-  </header>
-
-  <main class="wrap">
-    <div class="stage">
-      <figure class="panel" id="panel">
-        <div class="msg">Lade die aktuelle Ausgabe …</div>
-      </figure>
-    </div>
-
-    <div class="caption">
-      <p class="stamp" id="stamp" aria-live="polite"></p>
-      <div class="nav">
+    <div class="row2">
+      <p class="stamp" id="stamp" aria-live="polite">Lade …</p>
+      <nav class="nav" aria-label="Ausgaben">
         <button class="btn" id="older" type="button" disabled>Ältere</button>
         <button class="btn" id="newer" type="button" disabled>Neuere</button>
-        <button class="btn primary" id="latest" type="button" hidden>Zur aktuellen</button>
-      </div>
+        <button class="btn primary" id="all" type="button" disabled aria-haspopup="dialog">Alle</button>
+      </nav>
     </div>
+  </header>
 
-    <section class="archive" aria-labelledby="archive-title">
-      <h2 id="archive-title">Archiv</h2>
-      <p id="count">Alle bisherigen Ausgaben, die neueste zuerst.</p>
-      <div class="strip" id="strip" tabindex="0" aria-label="Zeitleiste aller Ausgaben">
-        <div class="days" id="days"></div>
-      </div>
-    </section>
+  <main class="stage wrap">
+    <figure class="panel" id="panel">
+      <div class="msg" id="msg">Lade die aktuelle Ausgabe …</div>
+    </figure>
   </main>
 
-  <footer class="wrap">
-    Ein Projekt von <strong>@improvedlaziness</strong>. Neue Ausgaben erscheinen automatisch.<span class="keys"> Mit den Pfeiltasten ← → blätterst du durch die Ausgaben.</span>
-  </footer>
+  <dialog class="drawer" id="drawer" aria-labelledby="drawer-title">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="drawer-title">Alle Ausgaben</h2>
+        <button class="btn" id="close" type="button">Schliessen</button>
+      </div>
+      <div class="list" id="list"></div>
+    </div>
+  </dialog>
 
 <script>
 (() => {
@@ -220,22 +234,30 @@
   const DIR = "newstoon";
   const API = `https://api.github.com/repos/${REPO}/contents/${DIR}?ref=main`;
   const PATTERN = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})\.jpg$/;
-  const REFRESH_MS = 10 * 60 * 1000;   // check every 10 minutes
-  const MIN_GAP_MS = 60 * 1000;         // at most once a minute when the tab regains focus
+  const REFRESH_MS = 10 * 60 * 1000;
+  const MIN_GAP_MS = 60 * 1000;
+  const SLIDE_MS = 420;
 
   const $ = (id) => document.getElementById(id);
-  const panel = $("panel"), stamp = $("stamp"), days = $("days");
-  const btnOlder = $("older"), btnNewer = $("newer"), btnLatest = $("latest");
+  const panel = $("panel"), stamp = $("stamp"), list = $("list"), drawer = $("drawer");
+  const btnOlder = $("older"), btnNewer = $("newer"), btnAll = $("all");
+  const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const fmtDay = new Intl.DateTimeFormat("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const fmtDayShort = new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
   const fmtTime = new Intl.DateTimeFormat("de-CH", { hour: "2-digit", minute: "2-digit" });
+  const fmtDayCompact = new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const narrow = matchMedia("(max-width: 700px)");
+  const label = (d) => `${fmtDay.format(d)}, ${fmtTime.format(d)} Uhr`;
+  const stampLabel = (d) => narrow.matches ? `${fmtDayCompact.format(d)}, ${fmtTime.format(d)} Uhr` : label(d);
 
   let items = [];
-  let current = 0;
+  let current = -1;
   let etag = null;
   let lastCheck = 0;
   let hasNew = false;
+  let token = 0;
+  let running = [];
 
   function showMessage(text) {
     panel.innerHTML = "";
@@ -245,49 +267,81 @@
     panel.appendChild(div);
   }
 
-  function updateLatestButton() {
-    const isLatest = current === 0;
-    btnLatest.hidden = isLatest;
-    btnLatest.textContent = hasNew ? "Neue Ausgabe ansehen" : "Zur aktuellen";
-    if (isLatest) hasNew = false;
-  }
-
-  function select(index, { scroll = true, updateHash = true } = {}) {
-    if (!items.length) return;
-    current = Math.max(0, Math.min(index, items.length - 1));
-    const item = items[current];
-
-    panel.innerHTML = "";
-    const link = document.createElement("a");
-    link.href = item.url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.title = "Bild in voller Grösse öffnen";
+  function makeSlide(item) {
+    const a = document.createElement("a");
+    a.className = "slide";
+    a.href = item.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.title = "Bild in voller Grösse öffnen";
     const img = document.createElement("img");
     img.src = item.url;
-    img.alt = `Newstoon vom ${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr`;
-    img.decoding = "async";
-    img.onerror = () => showMessage("Dieses Bild konnte nicht geladen werden. Versuche es in ein paar Minuten nochmals.");
-    link.appendChild(img);
-    panel.appendChild(link);
+    img.alt = `Newstoon vom ${label(item.date)}`;
+    a.appendChild(img);
+    return { el: a, img };
+  }
 
-    const isLatest = current === 0;
+  // direction: -1 = going older (new slides in from the left), +1 = going newer (from the right), 0 = no animation
+  async function showImage(item, direction) {
+    const my = ++token;
+    running.forEach((a) => a.finish());
+    running = [];
+
+    const { el, img } = makeSlide(item);
+    try { await img.decode(); } catch { /* still show it, the browser will render when ready */ }
+    if (my !== token) return;
+
+    panel.querySelector(".msg")?.remove();
+    const old = panel.querySelector(".slide");
+    panel.appendChild(el);
+
+    if (!old || direction === 0 || reduced()) {
+      if (old) old.remove();
+      return;
+    }
+    const from = direction < 0 ? "-100%" : "100%";
+    const to = direction < 0 ? "100%" : "-100%";
+    const opts = { duration: SLIDE_MS, easing: "cubic-bezier(.65,0,.35,1)" };
+    const aIn = el.animate([{ transform: `translateX(${from})` }, { transform: "translateX(0)" }], opts);
+    const aOut = old.animate([{ transform: "translateX(0)" }, { transform: `translateX(${to})` }], opts);
+    running = [aIn, aOut];
+    aOut.finished.then(() => old.remove()).catch(() => old.remove());
+  }
+
+  function select(index, { updateHash = true, animate = true } = {}) {
+    if (!items.length) return;
+    const next = Math.max(0, Math.min(index, items.length - 1));
+    if (next === current && panel.querySelector(".slide")) return;
+    const direction = !animate || current < 0 ? 0 : (next > current ? -1 : 1);
+    current = next;
+    const item = items[current];
+
+    showImage(item, direction);
+
     stamp.innerHTML = "";
     const time = document.createElement("time");
     time.dateTime = item.date.toISOString();
-    time.textContent = `${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr`;
-    const sub = document.createElement("span");
-    sub.textContent = isLatest ? "Aktuelle Ausgabe" : `Ausgabe ${items.length - current} von ${items.length}`;
-    stamp.append(time, sub);
+    time.textContent = stampLabel(item.date);
+    stamp.appendChild(time);
 
+    const isLatest = current === 0;
+    if (isLatest) hasNew = false;
     btnNewer.disabled = isLatest;
     btnOlder.disabled = current === items.length - 1;
-    updateLatestButton();
+    btnAll.disabled = false;
+    btnNewer.querySelector(".dot")?.remove();
+    if (hasNew) {
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.setAttribute("aria-hidden", "true");
+      btnNewer.appendChild(dot);
+      btnNewer.setAttribute("aria-label", "Neuere, eine neue Ausgabe ist erschienen");
+    } else {
+      btnNewer.removeAttribute("aria-label");
+    }
 
-    days.querySelectorAll(".shot").forEach((el) => {
-      const active = Number(el.dataset.index) === current;
-      el.setAttribute("aria-current", active ? "true" : "false");
-      if (active && scroll) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", inline: "center", block: "nearest" });
+    list.querySelectorAll(".entry").forEach((el) => {
+      el.setAttribute("aria-current", Number(el.dataset.index) === current ? "true" : "false");
     });
 
     if (updateHash) {
@@ -296,27 +350,26 @@
     }
   }
 
-  function renderTimeline() {
-    days.innerHTML = "";
-    let shots = null, lastKey = "";
+  function renderList() {
+    list.innerHTML = "";
+    let group = null, lastKey = "";
     items.forEach((item, i) => {
       const key = item.name.slice(0, 10);
       if (key !== lastKey) {
         lastKey = key;
-        const group = document.createElement("div");
+        group = document.createElement("section");
         group.className = "day";
         const h = document.createElement("h3");
         h.textContent = fmtDayShort.format(item.date);
-        shots = document.createElement("div");
-        shots.className = "shots";
-        group.append(h, shots);
-        days.appendChild(group);
+        group.appendChild(h);
+        list.appendChild(group);
       }
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "shot";
+      btn.className = "entry";
       btn.dataset.index = i;
-      btn.setAttribute("aria-label", `Ausgabe vom ${fmtDay.format(item.date)}, ${fmtTime.format(item.date)} Uhr anzeigen`);
+      btn.setAttribute("aria-current", i === current ? "true" : "false");
+      btn.setAttribute("aria-label", `Ausgabe vom ${label(item.date)} anzeigen`);
       const thumb = document.createElement("span");
       thumb.className = "thumb";
       const img = document.createElement("img");
@@ -329,12 +382,9 @@
       t.className = "time";
       t.textContent = fmtTime.format(item.date);
       btn.append(thumb, t);
-      btn.addEventListener("click", () => select(i));
-      shots.appendChild(btn);
+      btn.addEventListener("click", () => { drawer.close(); select(i); });
+      group.appendChild(btn);
     });
-    $("count").textContent = items.length === 1
-      ? "Bisher gibt es eine Ausgabe."
-      : `Alle ${items.length} bisherigen Ausgaben, die neueste zuerst.`;
   }
 
   function indexFromHash() {
@@ -367,12 +417,13 @@
     try {
       res = await fetch(API, { headers, cache: "no-store" });
     } catch {
-      if (initial) showMessage("Die Ausgaben konnten nicht geladen werden. Lade die Seite neu.");
+      if (initial) { showMessage("Die Ausgaben konnten nicht geladen werden. Lade die Seite neu."); stamp.textContent = ""; }
       return;
     }
     if (res.status === 304) return;
     if (!res.ok) {
       if (initial) {
+        stamp.textContent = "";
         showMessage(res.status === 403 || res.status === 429
           ? "GitHub lässt gerade keine weiteren Abfragen zu. Lade die Seite in einer Stunde neu."
           : "Die Ausgaben konnten nicht geladen werden. Lade die Seite neu.");
@@ -383,52 +434,68 @@
     const next = parse(await res.json());
 
     if (!next.length) {
-      if (initial) showMessage("Noch keine Ausgabe vorhanden. Die erste erscheint hier, sobald sie hochgeladen ist.");
+      if (initial) { stamp.textContent = ""; showMessage("Noch keine Ausgabe vorhanden. Die erste erscheint hier, sobald sie hochgeladen ist."); }
       return;
     }
 
     if (initial) {
       items = next;
-      renderTimeline();
-      select(indexFromHash(), { updateHash: false });
+      renderList();
+      select(indexFromHash(), { updateHash: false, animate: false });
       return;
     }
 
-    // Refresh: only redraw if the newest issue changed
     if (items.length && next[0].id === items[0].id && next.length === items.length) return;
 
     const viewingLatest = current === 0;
     const viewedId = items[current] && items[current].id;
     items = next;
-    renderTimeline();
+    const keep = items.findIndex((it) => it.id === viewedId);
+    current = keep >= 0 ? keep : 0;   // keep the internal position stable before switching
+    renderList();
 
     if (viewingLatest) {
-      select(0, { updateHash: false });
+      select(0, { updateHash: false });   // slides the new issue in from the right
     } else {
       hasNew = true;
-      const keep = items.findIndex((it) => it.id === viewedId);
-      select(keep >= 0 ? keep : 0, { scroll: false, updateHash: false });
+      const idx = current;
+      current = -2;                        // force a refresh of buttons without animating
+      select(idx, { updateHash: false, animate: false });
     }
   }
 
+  narrow.addEventListener("change", () => {
+    const t = stamp.querySelector("time");
+    if (t && items[current]) t.textContent = stampLabel(items[current].date);
+  });
+
+  // Controls
   btnOlder.addEventListener("click", () => select(current + 1));
   btnNewer.addEventListener("click", () => select(current - 1));
-  btnLatest.addEventListener("click", () => select(0));
+  btnAll.addEventListener("click", () => {
+    drawer.showModal();
+    const active = list.querySelector('.entry[aria-current="true"]');
+    if (active) { active.scrollIntoView({ block: "center" }); active.focus(); }
+  });
+  $("close").addEventListener("click", () => drawer.close());
+  drawer.addEventListener("click", (e) => { if (e.target === drawer) drawer.close(); });
+
   document.addEventListener("keydown", (e) => {
-    if (e.target.closest("input, textarea")) return;
+    if (drawer.open) return;
     if (e.key === "ArrowLeft") { e.preventDefault(); select(current + 1); }
     if (e.key === "ArrowRight") { e.preventDefault(); select(current - 1); }
   });
   window.addEventListener("hashchange", () => select(indexFromHash(), { updateHash: false }));
 
-  // Swipe on the main panel: left = older, right = newer
-  let touchX = null;
-  panel.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  // Swipe on the panel: drag right = older (comes in from the left), drag left = newer
+  let touchX = null, touchY = null;
+  panel.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
   panel.addEventListener("touchend", (e) => {
     if (touchX === null) return;
     const dx = e.changedTouches[0].clientX - touchX;
-    touchX = null;
-    if (Math.abs(dx) > 50) select(current + (dx < 0 ? 1 : -1));
+    const dy = e.changedTouches[0].clientY - touchY;
+    touchX = touchY = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) select(current + (dx > 0 ? 1 : -1));
   });
 
   // Auto refresh: every 10 minutes while visible, and when the tab comes back into view
